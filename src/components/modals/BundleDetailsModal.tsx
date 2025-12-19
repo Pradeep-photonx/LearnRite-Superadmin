@@ -17,7 +17,7 @@ import { CloseIcon } from "../icons/CommonIcons";
 import type { Bundle } from "../../utilities/bundlesData";
 import type { School } from "../../utilities/schoolsData";
 
-interface BundleDetailsDrawerProps {
+interface BundleDetailsModalProps {
   open: boolean;
   onClose: () => void;
   bundle: Bundle | null;
@@ -32,7 +32,7 @@ interface ItemData {
   price: string;
 }
 
-const BundleDetailsDrawer: React.FC<BundleDetailsDrawerProps> = ({
+const BundleDetailsModal: React.FC<BundleDetailsModalProps> = ({
   open,
   onClose,
   bundle,
@@ -368,5 +368,5 @@ const BundleDetailsDrawer: React.FC<BundleDetailsDrawerProps> = ({
   );
 };
 
-export default BundleDetailsDrawer;
+export default BundleDetailsModal;
 

@@ -25,7 +25,7 @@ import type { Bundle } from "../../utilities/bundlesData";
 import { MoreActionsIcon, StudyIcon } from "../icons/CommonIcons";
 import schoolLogo from "../../assets/images/delhi-public-school.png";
 import CreateBundleDrawer, { type BundleFormData } from "./CreateBundleDrawer";
-import BundleDetailsDrawer from "../modals/BundleDetailsDrawer";
+import BundleDetailsModal from "../modals/BundleDetailsModal";
 
 interface SchoolDetailViewProps {
     school: School;
@@ -391,7 +391,7 @@ const SchoolDetailView: React.FC<SchoolDetailViewProps> = ({ school, onBack }) =
             />
 
             {/* Bundle Details Drawer */}
-            <BundleDetailsDrawer
+            <BundleDetailsModal
                 open={isBundleDetailsDrawerOpen}
                 onClose={handleCloseBundleDetailsDrawer}
                 bundle={selectedBundle}
