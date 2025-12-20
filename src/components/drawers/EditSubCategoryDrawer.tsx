@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
     Box,
     TextField,
@@ -12,17 +12,17 @@ import {
     CircularProgress,
 } from "@mui/material";
 import BaseDrawer from "./BaseDrawer";
-import { createSubCategory, type Category, type CreateSubCategoryPayload } from "../../api/category";
+import { updateSubCategory, type UpdateSubCategoryPayload, type SubCategory } from "../../api/category";
 import { notifyError, notifySuccess } from "../../utils/toastUtils";
 
-interface CreateSubCategoryDrawerProps {
+interface EditSubCategoryDrawerProps {
     open: boolean;
     onClose: () => void;
-    onSubmit: () => void;
-    parentCategory: Category | null;
+    onSubmit?: () => void;
+    subCategory: SubCategory | null;
 }
 
-export interface SubCategoryFormData {
+export interface EditSubCategoryFormData {
     name: string;
     status: string;
 }
@@ -50,6 +50,8 @@ const StyledSelect = styled(Select)({
     },
 });
 
+const statusOptions = ["Active", "Inactive"];
+
 const FormField = styled(Box)({
     display: "flex",
     flexDirection: "column",
@@ -62,24 +64,29 @@ const FormLabel = styled(Typography)({
     color: "#121318",
 });
 
-// Mock options
-const statusOptions = ["Active", "Inactive"];
-
-const CreateSubCategoryDrawer: React.FC<CreateSubCategoryDrawerProps> = ({
+const EditSubCategoryDrawer: React.FC<EditSubCategoryDrawerProps> = ({
     open,
     onClose,
     onSubmit,
-    parentCategory,
+    subCategory,
 }) => {
-    const [formData, setFormData] = useState<SubCategoryFormData>({
+    const [formData, setFormData] = useState<EditSubCategoryFormData>({
         name: "",
         status: "",
     });
     const [loading, setLoading] = useState(false);
 
+    useEffect(() => {
+        if (subCategory && open) {
+            console.log("EditSubCategoryDrawer - subCategory:", subCategory);
+            setFormData({
+                name: subCategory.name || "",
+                status: subCategory.is_active ? "Active" : "Inactive",
+            });
+        }
+    }, [subCategory, open]);
 
-
-    const handleChange = (field: keyof SubCategoryFormData) => (
+    const handleChange = (field: keyof EditSubCategoryFormData) => (
         event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { value: unknown } }
     ) => {
         const value = event.target.value;
@@ -90,30 +97,35 @@ const CreateSubCategoryDrawer: React.FC<CreateSubCategoryDrawerProps> = ({
     };
 
     const handleSubmit = async () => {
-        // Basic validation
-        if (!formData.name || !formData.status || !parentCategory) {
+        if (!formData.name || !formData.status) {
             notifyError("Please fill in all required fields");
             return;
         }
 
+        if (!subCategory) {
+            notifyError("No subcategory selected");
+            return;
+        }
+
+        if (!subCategory.sub_category_id) {
+            notifyError("Invalid subcategory ID");
+            console.error("SubCategory object:", subCategory);
+            return;
+        }
+
+        const subCategoryId = subCategory.sub_category_id;
+
         setLoading(true);
         try {
-            const payload: CreateSubCategoryPayload = {
-                category_id: parentCategory.category_id,
+            const payload: UpdateSubCategoryPayload = {
                 name: formData.name,
                 is_active: formData.status === "Active",
             };
 
-            await createSubCategory(payload);
-
-            notifySuccess("Sub Category created successfully");
-            onSubmit();
+            await updateSubCategory(subCategoryId, payload);
+            notifySuccess("Sub Category updated successfully");
+            onSubmit?.();
             onClose();
-            // Reset form
-            setFormData({
-                name: "",
-                status: "",
-            });
         } catch (error) {
             notifyError(error);
         } finally {
@@ -122,7 +134,7 @@ const CreateSubCategoryDrawer: React.FC<CreateSubCategoryDrawerProps> = ({
     };
 
     return (
-        <BaseDrawer open={open} onClose={onClose} title="Add Sub Category" width={600}>
+        <BaseDrawer open={open} onClose={onClose} title="Edit Sub Category" width={600}>
             <Stack spacing={4}>
                 <Grid container spacing={3}>
                     <Grid size={{ xs: 12 }}>
@@ -136,23 +148,7 @@ const CreateSubCategoryDrawer: React.FC<CreateSubCategoryDrawerProps> = ({
                                 onChange={handleChange("name")}
                                 variant="outlined"
                                 fullWidth
-                            />
-                        </FormField>
-                    </Grid>
-
-                    <Grid size={{ xs: 12 }}>
-                        <FormField>
-                            <FormLabel>
-                                Parent Category <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
-                            </FormLabel>
-                            <StyledTextField
-                                value={parentCategory?.name || ""}
-                                variant="outlined"
-                                fullWidth
-                                disabled
-                                InputProps={{
-                                    readOnly: true,
-                                }}
+                                error={!formData.name && loading}
                             />
                         </FormField>
                     </Grid>
@@ -217,7 +213,7 @@ const CreateSubCategoryDrawer: React.FC<CreateSubCategoryDrawerProps> = ({
                             textTransform: "none",
                         }}
                     >
-                        {loading ? <CircularProgress size={24} color="inherit" /> : "Create Sub Category"}
+                        {loading ? <CircularProgress size={24} color="inherit" /> : "Update Sub Category"}
                     </Button>
                 </Stack>
             </Stack>
@@ -225,4 +221,4 @@ const CreateSubCategoryDrawer: React.FC<CreateSubCategoryDrawerProps> = ({
     );
 };
 
-export default CreateSubCategoryDrawer;
+export default EditSubCategoryDrawer;

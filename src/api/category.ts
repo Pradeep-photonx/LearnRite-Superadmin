@@ -61,7 +61,7 @@ export const createSubCategory = async (data: CreateSubCategoryPayload) => {
 };
 
 export interface SubCategory {
-    subcategory_id: number;
+    sub_category_id: number;
     category_id: number;
     name: string;
     is_active: boolean;
@@ -76,6 +76,23 @@ export const getSubCategoryList = async (categoryId: number) => {
     const response = await axiosClient.get<SubCategoryListResponse>(`/SubCategory/list/${categoryId}`);
     return response.data;
 };
+
+export interface UpdateSubCategoryPayload {
+    name?: string;
+    is_active?: boolean;
+}
+
+export const updateSubCategory = async (id: number, data: UpdateSubCategoryPayload) => {
+    const response = await axiosClient.patch(`/SubCategory/update/${id}`, data);
+    return response.data;
+};
+
+export const deleteSubCategory = async (id: number) => {
+    const response = await axiosClient.delete(`/SubCategory/delete/${id}`);
+    return response.data;
+};
+
+
 
 
 

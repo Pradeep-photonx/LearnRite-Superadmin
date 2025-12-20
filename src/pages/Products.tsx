@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
   Typography,
@@ -26,11 +27,14 @@ import CreateProductDrawer, { type ProductFormData } from "../components/drawers
 import CreateCategoryDrawer from "../components/drawers/CreateCategoryDrawer";
 import CreateSubCategoryDrawer from "../components/drawers/CreateSubCategoryDrawer";
 import EditCategoryDrawer from "../components/drawers/EditCategoryDrawer";
+import EditSubCategoryDrawer from "../components/drawers/EditSubCategoryDrawer";
 import DeleteConfirmationModal from "../components/modals/DeleteConfirmationModal";
-import { getCategoryList, deleteCategory, getSubCategoryList, type Category, type SubCategory } from "../api/category";
+import { getCategoryList, deleteCategory, getSubCategoryList, deleteSubCategory, type Category, type SubCategory } from "../api/category";
 import { notifyError, notifySuccess } from "../utils/toastUtils";
 
 const Products: React.FC = () => {
+  const { categorySlug } = useParams<{ categorySlug?: string }>();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
   const [actionMenuAnchor, setActionMenuAnchor] = useState<null | HTMLElement>(null);
   const [isCreateProductDrawerOpen, setIsCreateProductDrawerOpen] = useState(false);
@@ -46,6 +50,15 @@ const Products: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [subCategories, setSubCategories] = useState<SubCategory[]>([]);
   const [loadingSubCategories, setLoadingSubCategories] = useState(false);
+  const [subCategoryToEdit, setSubCategoryToEdit] = useState<SubCategory | null>(null);
+  const [isEditSubCategoryDrawerOpen, setIsEditSubCategoryDrawerOpen] = useState(false);
+  const [subCategoryToDelete, setSubCategoryToDelete] = useState<SubCategory | null>(null);
+  const [isDeleteSubCategoryModalOpen, setIsDeleteSubCategoryModalOpen] = useState(false);
+
+  // Helper function to create URL-friendly slug from category name
+  const createSlug = (name: string) => {
+    return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  };
 
   const fetchCategories = async () => {
     try {
@@ -65,6 +78,16 @@ const Products: React.FC = () => {
     }
   }, [activeTab]);
 
+  // Restore selected category from URL on mount
+  React.useEffect(() => {
+    if (categorySlug && categories.length > 0) {
+      const category = categories.find(c => createSlug(c.name) === categorySlug);
+      if (category && !selectedCategory) {
+        handleCategoryClick(category);
+      }
+    }
+  }, [categorySlug, categories]);
+
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
   };
@@ -72,17 +95,22 @@ const Products: React.FC = () => {
 
 
   const [activeMenuCategory, setActiveMenuCategory] = useState<Category | null>(null);
+  const [activeMenuSubCategory, setActiveMenuSubCategory] = useState<SubCategory | null>(null);
 
-  const handleActionMenuOpen = (event: React.MouseEvent<HTMLElement>, category?: Category) => {
+  const handleActionMenuOpen = (event: React.MouseEvent<HTMLElement>, category?: Category, subCategory?: SubCategory) => {
     setActionMenuAnchor(event.currentTarget);
     if (category) {
       setActiveMenuCategory(category);
+    }
+    if (subCategory) {
+      setActiveMenuSubCategory(subCategory);
     }
   };
 
   const handleActionMenuClose = () => {
     setActionMenuAnchor(null);
     setActiveMenuCategory(null);
+    setActiveMenuSubCategory(null);
   };
 
   const handleEditCategory = () => {
@@ -93,9 +121,22 @@ const Products: React.FC = () => {
     handleActionMenuClose();
   };
 
+  const handleEditSubCategory = () => {
+    if (activeMenuSubCategory) {
+      setSubCategoryToEdit(activeMenuSubCategory);
+      setIsEditSubCategoryDrawerOpen(true);
+    }
+    handleActionMenuClose();
+  };
+
   const handleCloseEditCategoryDrawer = () => {
     setIsEditCategoryDrawerOpen(false);
     setCategoryToEdit(null);
+  };
+
+  const handleCloseEditSubCategoryDrawer = () => {
+    setIsEditSubCategoryDrawerOpen(false);
+    setSubCategoryToEdit(null);
   };
 
   const handleDeleteCategoryClick = () => {
@@ -106,9 +147,22 @@ const Products: React.FC = () => {
     handleActionMenuClose();
   };
 
+  const handleDeleteSubCategoryClick = () => {
+    if (activeMenuSubCategory) {
+      setSubCategoryToDelete(activeMenuSubCategory);
+      setIsDeleteSubCategoryModalOpen(true);
+    }
+    handleActionMenuClose();
+  };
+
   const handleCloseDeleteCategoryModal = () => {
     setIsDeleteCategoryModalOpen(false);
     setCategoryToDelete(null);
+  };
+
+  const handleCloseDeleteSubCategoryModal = () => {
+    setIsDeleteSubCategoryModalOpen(false);
+    setSubCategoryToDelete(null);
   };
 
   const handleConfirmDeleteCategory = async () => {
@@ -127,9 +181,42 @@ const Products: React.FC = () => {
     }
   };
 
+  const handleConfirmDeleteSubCategory = async () => {
+    if (!subCategoryToDelete) return;
+
+    console.log("Full subCategoryToDelete object:", subCategoryToDelete);
+    console.log("Available properties:", Object.keys(subCategoryToDelete));
+
+    const subCategoryId = subCategoryToDelete.sub_category_id;
+    console.log("Extracted subCategoryId:", subCategoryId);
+
+    if (!subCategoryId) {
+      notifyError("Invalid subcategory ID");
+      console.error("SubCategory object:", subCategoryToDelete);
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await deleteSubCategory(subCategoryId);
+      notifySuccess("Sub Category deleted successfully");
+      if (selectedCategory) {
+        handleCategoryClick(selectedCategory);
+      }
+      handleCloseDeleteSubCategoryModal();
+    } catch (error) {
+      notifyError(error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleCategoryClick = async (category: Category) => {
     setSelectedCategory(category);
     setLoadingSubCategories(true);
+    // Update URL with category slug
+    const slug = createSlug(category.name);
+    navigate(`/products/categories/${slug}`, { replace: true });
     try {
       const data = await getSubCategoryList(category.category_id);
       setSubCategories(data.rows);
@@ -143,6 +230,8 @@ const Products: React.FC = () => {
   const handleBackToCategories = () => {
     setSelectedCategory(null);
     setSubCategories([]);
+    // Navigate back to products page
+    navigate('/products', { replace: true });
   };
 
   const handleAddProduct = () => {
@@ -177,9 +266,22 @@ const Products: React.FC = () => {
     fetchCategories();
   };
 
+  const handleSubmitSubCategory = () => {
+    // Refresh subcategories for the selected category
+    if (selectedCategory) {
+      handleCategoryClick(selectedCategory);
+    }
+  };
+
   const handleUpdateCategory = () => {
     fetchCategories();
   }
+
+  const handleUpdateSubCategory = () => {
+    if (selectedCategory) {
+      handleCategoryClick(selectedCategory);
+    }
+  };
 
   return (
     <Box sx={{
@@ -561,7 +663,7 @@ const Products: React.FC = () => {
                       <TableCell align="right">
                         <IconButton
                           size="small"
-                          onClick={handleActionMenuOpen}
+                          onClick={(e) => handleActionMenuOpen(e, undefined, subCategory)}
                           sx={{
                             color: "#121318",
                             padding: "4px",
@@ -596,13 +698,10 @@ const Products: React.FC = () => {
           },
         }}
       >
-        {/* <MenuItem onClick={handleActionMenuClose}>
-          <Typography variant="r14">View Details</Typography>
-        </MenuItem> */}
-        <MenuItem onClick={handleEditCategory}>
+        <MenuItem onClick={activeMenuSubCategory ? handleEditSubCategory : handleEditCategory}>
           <Typography variant="r14">Edit</Typography>
         </MenuItem>
-        <MenuItem onClick={handleDeleteCategoryClick}>
+        <MenuItem onClick={activeMenuSubCategory ? handleDeleteSubCategoryClick : handleDeleteCategoryClick}>
           <Typography variant="r14" sx={{ color: "#E24600" }}>
             Delete
           </Typography>
@@ -617,12 +716,29 @@ const Products: React.FC = () => {
         category={categoryToEdit}
       />
 
+      {/* Edit Sub Category Drawer */}
+      <EditSubCategoryDrawer
+        open={isEditSubCategoryDrawerOpen}
+        onClose={handleCloseEditSubCategoryDrawer}
+        onSubmit={handleUpdateSubCategory}
+        subCategory={subCategoryToEdit}
+      />
+
       <DeleteConfirmationModal
         open={isDeleteCategoryModalOpen}
         onClose={handleCloseDeleteCategoryModal}
         onConfirm={handleConfirmDeleteCategory}
         title="Delete Category"
         description={`Are you sure you want to delete ${categoryToDelete?.name}? This action cannot be undone.`}
+        loading={isDeleting}
+      />
+
+      <DeleteConfirmationModal
+        open={isDeleteSubCategoryModalOpen}
+        onClose={handleCloseDeleteSubCategoryModal}
+        onConfirm={handleConfirmDeleteSubCategory}
+        title="Delete Sub Category"
+        description={`Are you sure you want to delete ${subCategoryToDelete?.name}? This action cannot be undone.`}
         loading={isDeleting}
       />
 
@@ -644,7 +760,8 @@ const Products: React.FC = () => {
       <CreateSubCategoryDrawer
         open={isCreateSubCategoryDrawerOpen}
         onClose={handleCloseCreateSubCategoryDrawer}
-        onSubmit={() => console.log("Sub Category Created")}
+        onSubmit={handleSubmitSubCategory}
+        parentCategory={selectedCategory}
       />
     </Box>
   );

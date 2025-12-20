@@ -39,6 +39,7 @@ function App() {
                     <Route path="/schools" element={<Schools />} />
                     <Route path="/school-bundles" element={<SchoolBundles />} />
                     <Route path="/products" element={<Products />} />
+                    <Route path="/products/categories/:categorySlug" element={<Products />} />
                     <Route path="/customers" element={<Customers />} />
                     <Route path="/orders" element={<Orders />} />
                     <Route path="*" element={<NotFound />} />
