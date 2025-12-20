@@ -3,11 +3,12 @@ export { schoolsData } from "./schoolsData";
 export type { School } from "./schoolsData";
 export { bundlesData } from "./bundlesData";
 export type { Bundle } from "./bundlesData";
-
-// Add other data exports here as you create them:
-// export { customersData } from "./customersData";
-// export { ordersData } from "./ordersData";
-// export { productsData } from "./productsData";
+export { productsData } from "./productsData";
+export type { Product } from "./productsData";
+export { customersData } from "./customersData";
+export type { Customer } from "./customersData";
+export { ordersData } from "./ordersData";
+export type { Order } from "./ordersData";
 
 
 

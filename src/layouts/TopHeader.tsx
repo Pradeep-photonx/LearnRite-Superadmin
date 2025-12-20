@@ -56,6 +56,12 @@ const TopHeader: React.FC = () => {
     setUserMenuAnchor(null);
   };
 
+  const handleLogout = () => {
+    handleUserMenuClose();
+    localStorage.removeItem("token");
+    navigate("/login");
+  };
+
   return (
     <Box
       sx={{
@@ -73,7 +79,7 @@ const TopHeader: React.FC = () => {
       >
         {/* Left Section: Back Arrow and Search */}
         <Stack direction="row" alignItems="center" spacing={2} flex={1}>
-          
+
 
           <Paper
             elevation={0}
@@ -118,11 +124,11 @@ const TopHeader: React.FC = () => {
             sx={{
               color: "#121318",
               padding: "8px",
-              border:"1px solid #1213181A",
+              border: "1px solid #1213181A",
               backgroundColor: "#FFF",
               "&:hover": {
                 backgroundColor: "#FFF",
-                border:"1px solid #1213181A",
+                border: "1px solid #1213181A",
               },
             }}
           >
@@ -158,19 +164,19 @@ const TopHeader: React.FC = () => {
               LR
             </Avatar>
             <Box sx={{
-              display:"flex",
-              flexDirection:"column",
-              gap:"1px",
-              marginLeft:"15px !important",
+              display: "flex",
+              flexDirection: "column",
+              gap: "1px",
+              marginLeft: "15px !important",
             }}>
               <Typography
                 variant="m16"
-                // sx={{
-                //   color: "#121318",
-                //   fontSize: "14px",
-                //   fontWeight: 600,
-                //   lineHeight: "20px",
-                // }}
+              // sx={{
+              //   color: "#121318",
+              //   fontSize: "14px",
+              //   fontWeight: 600,
+              //   lineHeight: "20px",
+              // }}
               >
                 Learnrite
               </Typography>
@@ -229,7 +235,7 @@ const TopHeader: React.FC = () => {
             <MenuItem onClick={handleUserMenuClose}>
               <Typography variant="r14">Settings</Typography>
             </MenuItem>
-            <MenuItem onClick={handleUserMenuClose}>
+            <MenuItem onClick={handleLogout}>
               <Typography variant="r14">Logout</Typography>
             </MenuItem>
           </Menu>

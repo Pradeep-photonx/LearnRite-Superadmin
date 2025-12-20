@@ -12,8 +12,12 @@ import {
   styled,
   Grid,
   FormGroup,
+  CircularProgress,
+  Alert,
 } from "@mui/material";
 import BaseDrawer from "./BaseDrawer";
+import { registerSchool } from "../../api/school";
+import { notifyError, notifySuccess } from "../../utils/toastUtils";
 
 interface AddSchoolDrawerProps {
   open: boolean;
@@ -33,13 +37,41 @@ export interface SchoolFormData {
   admissionCheck: boolean;
   sendInviteEmail: boolean;
   logo?: File | null;
+  address: string;
+  admission_id: boolean;
 }
+
+const FormField = styled(Box)({
+  display: "flex",
+  flexDirection: "column",
+  gap: "8px",
+});
+
+const FormLabel = styled(Typography)({
+  fontSize: "15px",
+  fontWeight: 500,
+  color: "#121318",
+});
+
+const StyledTextField = styled(TextField)({
+  "& .MuiOutlinedInput-root": {
+    borderRadius: "12px",
+    fontSize: "14px",
+    backgroundColor: "#FFFFFF",
+  },
+  "& .MuiInputBase-input::placeholder": {
+    color: "#9CA3AF",
+    fontWeight: 400,
+    fontSize: "14px",
+    opacity: 1,
+  },
+});
 
 
 const AddSchoolDrawer: React.FC<AddSchoolDrawerProps> = ({
   open,
   onClose,
-  onSubmit,
+  onSubmit, // Optional, can be used for parent refresh
 }) => {
   const [formData, setFormData] = useState<SchoolFormData>({
     schoolName: "",
@@ -53,10 +85,14 @@ const AddSchoolDrawer: React.FC<AddSchoolDrawerProps> = ({
     admissionCheck: true,
     sendInviteEmail: true,
     logo: null,
+    address: "",
+    admission_id: false,
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof SchoolFormData, string>>>({});
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const handleChange = (field: keyof SchoolFormData) => (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { value: unknown } }
@@ -118,31 +154,84 @@ const AddSchoolDrawer: React.FC<AddSchoolDrawerProps> = ({
     if (!formData.status) {
       newErrors.status = "Status is required";
     }
+    if (!formData.logo && !logoPreview) {
+      // Assuming logo is required as per validtion
+      // If logic differs, remove this.
+    }
 
     setErrors(newErrors);
+    console.log("Validation Errors:", newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
+  const convertFileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  const handleSubmit = async () => {
     if (validateForm()) {
-      onSubmit?.(formData);
-      // Reset form
-      setFormData({
-        schoolName: "",
-        branch: "",
-        board: "",
-        adminName: "",
-        email: "",
-        mobileNumber: "",
-        status: "",
-        role: "Admin",
-        admissionCheck: true,
-        sendInviteEmail: true,
-        logo: null,
-      });
-      setLogoPreview(null);
-      setErrors({});
-      onClose();
+      setLoading(true);
+      setApiError(null);
+
+      try {
+        let imageBase64 = "";
+        if (formData.logo) {
+          imageBase64 = await convertFileToBase64(formData.logo);
+        } else if (logoPreview) {
+          // In case of edit or preserved state, logic might be needed
+          imageBase64 = logoPreview;
+        }
+
+        const payload = {
+          school_name: formData.schoolName,
+          branch: formData.branch,
+          board: formData.board,
+          fullname: formData.adminName,
+          email: formData.email,
+          mobile_number: formData.mobileNumber,
+          status: formData.status,
+          image: imageBase64,
+          address: formData.address || "",
+          admission_id: formData.admission_id,
+        };
+
+        console.log("Registering School Payload:", payload);
+        const response = await registerSchool(payload);
+        console.log("Registration Success:", response);
+        notifySuccess("School registered successfully");
+
+        onSubmit?.(formData);
+
+        // Reset form
+        setFormData({
+          schoolName: "",
+          branch: "",
+          board: "",
+          adminName: "",
+          email: "",
+          mobileNumber: "",
+          status: "",
+          role: "Admin",
+          admissionCheck: true,
+          sendInviteEmail: true,
+          logo: null,
+          address: "",
+          admission_id: false,
+        });
+        setLogoPreview(null);
+        setErrors({});
+        onClose();
+
+      } catch (error: any) {
+        notifyError(error);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -159,37 +248,16 @@ const AddSchoolDrawer: React.FC<AddSchoolDrawerProps> = ({
       admissionCheck: true,
       sendInviteEmail: true,
       logo: null,
+      address: "",
+      admission_id: false,
     });
     setLogoPreview(null);
     setErrors({});
+    setApiError(null);
     onClose();
   };
 
-  const FormField = styled(Box)({
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-  });
-  
-  const FormLabel = styled(Typography)({
-    fontSize: "15px",
-    fontWeight: 500,
-    color: "#121318",
-  });
-  
-  const StyledTextField = styled(TextField)({
-    "& .MuiOutlinedInput-root": {
-      borderRadius: "12px",
-      fontSize: "14px",
-      backgroundColor: "#FFFFFF",
-    },
-    "& .MuiInputBase-input::placeholder": {
-      color: "#9CA3AF",
-      fontWeight: 400,
-      fontSize: "14px",
-      opacity: 1,
-    },
-  });
+
 
   // const StyledCheckbox = styled(Checkbox)({
   //   padding: "4px",
@@ -225,39 +293,47 @@ const AddSchoolDrawer: React.FC<AddSchoolDrawerProps> = ({
   return (
     <BaseDrawer open={open} onClose={onClose} title="Add School" width={900}>
       <Stack spacing={4}>
+        {apiError && (
+          <Alert severity="error">{apiError}</Alert>
+        )}
+
         {/* School Details Section */}
         <Box>
-            <Grid container spacing={3}>
-              <Grid  size={{xs:12}}>
-                 <FormField>
-                  <FormLabel>
-                    School Name <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
-                  </FormLabel>
-                  <StyledTextField
-                    placeholder="Enter school name"
-                      value={formData.schoolName}
-                    onChange={handleChange("schoolName")}
-                    variant="outlined"
-                    fullWidth
-                  />
-                </FormField>
-              </Grid>
-              <Grid  size={{xs:12, md:6}}>
+          <Grid container spacing={3}>
+            <Grid size={{ xs: 12 }}>
               <FormField>
-                  <FormLabel>
-                    Branch <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
-                  </FormLabel>
-                  <StyledTextField
-                    placeholder="Enter branch name"
-                      value={formData.branch}
-                    onChange={handleChange("branch")}
-                    variant="outlined"
-                    fullWidth
-                  />
-                </FormField>
-              </Grid>
-            <Grid size={{xs:12, md:6}}>
-              <FormField> 
+                <FormLabel>
+                  School Name <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
+                </FormLabel>
+                <StyledTextField
+                  placeholder="Enter school name"
+                  value={formData.schoolName}
+                  onChange={handleChange("schoolName")}
+                  variant="outlined"
+                  fullWidth
+                  error={!!errors.schoolName}
+                  helperText={errors.schoolName}
+                />
+              </FormField>
+            </Grid>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <FormField>
+                <FormLabel>
+                  Branch <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
+                </FormLabel>
+                <StyledTextField
+                  placeholder="Enter branch name"
+                  value={formData.branch}
+                  onChange={handleChange("branch")}
+                  variant="outlined"
+                  fullWidth
+                  error={!!errors.branch}
+                  helperText={errors.branch}
+                />
+              </FormField>
+            </Grid>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <FormField>
                 <FormLabel>
                   Board <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
                 </FormLabel>
@@ -267,10 +343,12 @@ const AddSchoolDrawer: React.FC<AddSchoolDrawerProps> = ({
                   onChange={handleChange("board")}
                   variant="outlined"
                   fullWidth
-                  />
+                  error={!!errors.board}
+                  helperText={errors.board}
+                />
               </FormField>
-                  </Grid>
             </Grid>
+          </Grid>
         </Box>
 
         {/* Admin Details Section */}
@@ -284,10 +362,10 @@ const AddSchoolDrawer: React.FC<AddSchoolDrawerProps> = ({
             Admin Details
           </Typography>
           <Grid container spacing={3}>
-            <Grid size={{xs:12, md:6}}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <FormField>
                 <FormLabel>
-                  Admin Name <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>  
+                  Admin Name <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
                 </FormLabel>
                 <StyledTextField
                   placeholder="Enter admin name"
@@ -295,59 +373,87 @@ const AddSchoolDrawer: React.FC<AddSchoolDrawerProps> = ({
                   onChange={handleChange("adminName")}
                   variant="outlined"
                   fullWidth
+                  error={!!errors.adminName}
+                  helperText={errors.adminName}
                 />
               </FormField>
-              </Grid>
-              <Grid size={{xs:12, md:6}}>
-                <FormField>
-                  <FormLabel>
-                    Email Address <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
-                  </FormLabel>
+            </Grid>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <FormField>
+                <FormLabel>
+                  Email Address <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
+                </FormLabel>
                 <StyledTextField
                   placeholder="example@gmail.com"
                   value={formData.email}
                   onChange={handleChange("email")}
                   variant="outlined"
                   fullWidth
+                  error={!!errors.email}
+                  helperText={errors.email}
                 />
               </FormField>
-              </Grid>
-              <Grid size={{xs:12, md:6}}>
-                <FormField>
-                  <FormLabel>
-                    Phone Number/Email <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
-                  </FormLabel>
-                  <StyledTextField
-                    placeholder="Enter phone number or email"
-                    // value={formData.phoneNumber}
-                    // onChange={handleChange("phoneNumber")}
-                    variant="outlined"
-                    fullWidth
-                  />
-                </FormField>
-              </Grid>
-              <Grid size={{xs:12, md:6}}>
-                <FormField>
-                  <FormLabel>
-                    Status <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
-                  </FormLabel>
-                  <Select
-                      value={formData.status}
-                      onChange={handleChange("status")}
-                      variant="outlined"
-                      fullWidth
-
-                    >
-                      <MenuItem value="Active">Active</MenuItem>
-                      <MenuItem value="Inactive">Inactive</MenuItem>
-                    </Select>
-                </FormField>
-              </Grid>
-              <Grid size={{xs:12}}>
+            </Grid>
+            <Grid size={{ xs: 12, md: 6 }}>
               <FormField>
-                  <FormLabel>
-                    Role <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
-                  </FormLabel>
+                <FormLabel>
+                  Phone Number<Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
+                </FormLabel>
+                <StyledTextField
+                  placeholder="Enter phone number or email"
+                  value={formData.mobileNumber}
+                  onChange={handleChange("mobileNumber")}
+                  variant="outlined"
+                  fullWidth
+                  error={!!errors.mobileNumber}
+                  helperText={errors.mobileNumber}
+                />
+              </FormField>
+            </Grid>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <FormField>
+                <FormLabel>
+                  Status <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
+                </FormLabel>
+                <Select
+                  value={formData.status}
+                  onChange={handleChange("status") as any}
+                  variant="outlined"
+                  fullWidth
+                  displayEmpty
+                  sx={{
+                    borderRadius: '12px',
+                    "& .MuiOutlinedInput-notchedOutline": {
+                      borderColor: errors.status ? "#d32f2f" : undefined
+                    }
+                  }}
+                >
+                  <MenuItem value="" disabled>Select Status</MenuItem>
+                  <MenuItem value="Active">Active</MenuItem>
+                  <MenuItem value="Inactive">Inactive</MenuItem>
+                </Select>
+                {errors.status && <Typography variant="caption" color="error" sx={{ ml: 2, mt: 0.5 }}>{errors.status}</Typography>}
+              </FormField>
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <FormField>
+                <FormLabel>
+                  Address
+                </FormLabel>
+                <StyledTextField
+                  placeholder="Enter address"
+                  value={formData.address}
+                  onChange={handleChange("address")}
+                  variant="outlined"
+                  fullWidth
+                />
+              </FormField>
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <FormField>
+                <FormLabel>
+                  Role <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
+                </FormLabel>
                 <StyledTextField
                   placeholder="Enter role"
                   value={formData.role}
@@ -357,15 +463,29 @@ const AddSchoolDrawer: React.FC<AddSchoolDrawerProps> = ({
                   fullWidth
                 />
               </FormField>
-              </Grid>
+            </Grid>
 
           </Grid>
         </Box>
 
         {/* Additional Options */}
-        <Box sx={{ margin:"15px 0px 0px 0px !important" }}>
-        <FormGroup sx={{ display: "flex", flexDirection: "column", gap: "15px", justifyContent: "flex-start", alignItems: "flex-start" }}>
-          <FormControlLabel control={<Checkbox defaultChecked
+        <Box sx={{ margin: "15px 0px 0px 0px !important" }}>
+          <FormGroup sx={{ display: "flex", flexDirection: "column", gap: "15px", justifyContent: "flex-start", alignItems: "flex-start" }}>
+            <FormControlLabel control={<Checkbox
+              checked={formData.admission_id}
+              onChange={(e) => setFormData({ ...formData, admission_id: e.target.checked })}
+              sx={{
+                color: "#D96200",
+                borderRadius: "4px",
+                padding: "0px 05px 0px 10px",
+                '&.Mui-checked': {
+                  color: "#D96200",
+                  borderRadius: "4px",
+                },
+              }}
+
+            />} label="Admission Check" />
+            {/* <FormControlLabel control={<Checkbox defaultChecked
           sx={{
             color: "#D96200",
             borderRadius: "4px",
@@ -375,25 +495,13 @@ const AddSchoolDrawer: React.FC<AddSchoolDrawerProps> = ({
               borderRadius: "4px",
             },
           }}
-          
-          />} label="Admission Check"  />
-          <FormControlLabel control={<Checkbox defaultChecked
-          sx={{
-            color: "#D96200",
-            borderRadius: "4px",
-            padding: "0px 05px 0px 10px",
-            '&.Mui-checked': {
-              color: "#D96200",
-              borderRadius: "4px",
-            },
-          }}
-          />} label="Send Invite Email" />
-        </FormGroup>
+          />} label="Send Invite Email" /> */}
+          </FormGroup>
         </Box>
 
         {/* Logo Upload */}
         <Box sx={{
-          margin:"15px 0px 0px 0px !important"
+          margin: "15px 0px 0px 0px !important"
         }}>
           <Typography variant="sb16" sx={{ marginBottom: "8px", color: "#121318" }}>
             Logo <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
@@ -437,7 +545,7 @@ const AddSchoolDrawer: React.FC<AddSchoolDrawerProps> = ({
                 />
                 <Typography
                   variant="r14"
-                  sx={{ marginTop: "12px", color: "#2C65F9", cursor: "pointer",}}
+                  sx={{ marginTop: "12px", color: "#2C65F9", cursor: "pointer", }}
                   onClick={(e) => {
                     e.stopPropagation();
                     document.getElementById("logo-upload")?.click();
@@ -492,7 +600,7 @@ const AddSchoolDrawer: React.FC<AddSchoolDrawerProps> = ({
                     />
                   </svg>
                 </Box>
-                
+
                 {/* Text Content */}
                 <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "4px" }}>
                   <Typography
@@ -525,7 +633,7 @@ const AddSchoolDrawer: React.FC<AddSchoolDrawerProps> = ({
         </Box>
 
         {/* Action Buttons */}
-        <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ 
+        <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{
           marginTop: "15px 0px 0px 0px !important",
           borderTop: "1px solid #1214191A",
           paddingTop: "15px",
@@ -534,6 +642,7 @@ const AddSchoolDrawer: React.FC<AddSchoolDrawerProps> = ({
           <Button
             variant="outlined"
             onClick={handleCancel}
+            disabled={loading}
             sx={{
               borderColor: "#D1D4DE",
               color: "#121318",
@@ -550,18 +659,18 @@ const AddSchoolDrawer: React.FC<AddSchoolDrawerProps> = ({
           <Button
             variant="contained"
             onClick={handleSubmit}
+            disabled={loading}
             sx={{
               textTransform: "none",
               minWidth: "140px",
             }}
           >
-            Create Admin
+            {loading ? <CircularProgress size={24} color="inherit" /> : "Create Admin"}
           </Button>
         </Stack>
       </Stack>
     </BaseDrawer>
   );
-};
+}; // End of AddSchoolDrawer component
 
 export default AddSchoolDrawer;
-

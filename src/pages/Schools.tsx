@@ -17,19 +17,49 @@ import {
   MenuItem,
 } from "@mui/material";
 import { Add, KeyboardArrowDown } from "@mui/icons-material";
-import { schoolsData } from "../utilities/schoolsData";
-import type { School } from "../utilities/schoolsData";
 import { MoreActionsIcon } from "../components/icons/CommonIcons";
+import { getSchoolList, deleteSchool } from "../api/school";
+import type { School } from "../api/school";
 import AddSchoolDrawer, { type SchoolFormData } from "../components/drawers/AddSchoolDrawer";
+import EditSchoolDrawer from "../components/drawers/EditSchoolDrawer";
 import SchoolDetailView from "../components/drawers/SchoolDetailView";
 import schoolLogo from "../assets/images/delhi-public-school.png";
+import { notifyError, notifySuccess } from "../utils/toastUtils";
+import DeleteConfirmationModal from "../components/modals/DeleteConfirmationModal";
+import { format } from "date-fns";
 
 const Schools: React.FC = () => {
   const [filterAnchor, setFilterAnchor] = useState<null | HTMLElement>(null);
   const [selectedFilter, setSelectedFilter] = useState("All Schools");
   const [actionMenuAnchor, setActionMenuAnchor] = useState<null | HTMLElement>(null);
   const [isAddSchoolDrawerOpen, setIsAddSchoolDrawerOpen] = useState(false);
+  const [isEditSchoolDrawerOpen, setIsEditSchoolDrawerOpen] = useState(false);
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
+  const [schoolToEdit, setSchoolToEdit] = useState<School | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [schoolToDelete, setSchoolToDelete] = useState<School | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  // Separate state for the school activated via correct action menu
+  const [activeMenuSchool, setActiveMenuSchool] = useState<School | null>(null);
+  const [schools, setSchools] = useState<School[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch schools on component mount
+  React.useEffect(() => {
+    const fetchSchools = async () => {
+      try {
+        setLoading(true);
+        const data = await getSchoolList();
+        setSchools(data.rows);
+      } catch (error) {
+        notifyError(error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSchools();
+  }, []);
 
   const handleFilterOpen = (event: React.MouseEvent<HTMLElement>) => {
     setFilterAnchor(event.currentTarget);
@@ -44,12 +74,69 @@ const Schools: React.FC = () => {
     setFilterAnchor(null);
   };
 
-  const handleActionMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+  const handleActionMenuOpen = (event: React.MouseEvent<HTMLElement>, school: School) => {
+    event.stopPropagation(); // Stop row click
     setActionMenuAnchor(event.currentTarget);
+    setActiveMenuSchool(school);
   };
 
   const handleActionMenuClose = () => {
     setActionMenuAnchor(null);
+    setActiveMenuSchool(null);
+  };
+
+  const handleEditSchool = () => {
+    if (activeMenuSchool) {
+      setSchoolToEdit(activeMenuSchool);
+      setIsEditSchoolDrawerOpen(true);
+    }
+    handleActionMenuClose();
+  };
+
+  const handleCloseEditSchoolDrawer = () => {
+    setIsEditSchoolDrawerOpen(false);
+    setSchoolToEdit(null);
+  };
+
+  const handleDeleteClick = () => {
+    if (activeMenuSchool) {
+      setSchoolToDelete(activeMenuSchool);
+      setIsDeleteModalOpen(true);
+    }
+    handleActionMenuClose();
+  };
+
+  const handleCloseDeleteModal = () => {
+    setIsDeleteModalOpen(false);
+    setSchoolToDelete(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (schoolToDelete) {
+      try {
+        setIsDeleting(true);
+        await deleteSchool(schoolToDelete.school_id);
+        notifySuccess("School deleted successfully");
+        handleCloseDeleteModal();
+        refreshSchools();
+      } catch (error) {
+        notifyError(error);
+      } finally {
+        setIsDeleting(false);
+      }
+    }
+  };
+
+  const refreshSchools = async () => {
+    try {
+      setLoading(true);
+      const data = await getSchoolList();
+      setSchools(data.rows);
+    } catch (error) {
+      notifyError(error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAddSchool = () => {
@@ -64,6 +151,7 @@ const Schools: React.FC = () => {
     // Handle form submission
     console.log("School data:", data);
     // You can add API call here to save the school data
+    refreshSchools();
   };
 
   const handleSchoolClick = (school: School) => {
@@ -180,77 +268,85 @@ const Schools: React.FC = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {schoolsData.map((school: School) => (
-              <TableRow
-                key={school.id}
-                onClick={() => handleSchoolClick(school)}
-                sx={{
-                  cursor: "pointer",
-                  // "&:hover": {
-                  //   backgroundColor: "#F9FAFB",
-                  // },
-                }}
-              >
-                <TableCell>
-                  <Stack direction="row" alignItems="center" spacing={1.5}>
-                    <img
-                      style={{ width: "40px", height: "45px", }}
-                      src={school.logo || schoolLogo}
-                      alt={school.schoolName}
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = "none";
-                      }}
-                    />
-                    <Typography>{school.schoolName}</Typography>
-                  </Stack>
-                </TableCell>
-                <TableCell>
-                  <Typography>{school.branch}</Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography>{school.adminName}</Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography>{school.totalBundles}</Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography >{school.createdOn}</Typography>
-                </TableCell>
-                <TableCell>
-                  <Chip
-                    label={school.status}
-                    size="small"
-                    sx={{
-                      backgroundColor:
-                        school.status === "Active" ? "#D5F8E7" : "#FFF0EE",
-                      color: school.status === "Active" ? "#17B168" : "#EB291B",
-                      fontWeight: 500,
-                      fontSize: "14px",
-                      borderRadius: "12px",
-                      "& .MuiChip-label": {
-                        padding: "6px 10px",
-                      },
-                    }}
-                  />
-                </TableCell>
-                <TableCell align="right" onClick={(e) => e.stopPropagation()}>
-                  <IconButton
-                    size="small"
-                    onClick={handleActionMenuOpen}
-                    sx={{
-                      color: "#121318",
-                      padding: "4px",
-                      "&:focus": {
-                        outline: "none !important",
-                      },
-                    }}
-                  >
-                    <MoreActionsIcon />
-                  </IconButton>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={7} align="center">
+                  Loading...
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              schools.map((school: School) => (
+                <TableRow
+                  key={school.school_id}
+                  onClick={() => handleSchoolClick(school)}
+                  sx={{
+                    cursor: "pointer",
+                    // "&:hover": {
+                    //   backgroundColor: "#F9FAFB",
+                    // },
+                  }}
+                >
+                  <TableCell>
+                    <Stack direction="row" alignItems="center" spacing={1.5}>
+                      <img
+                        style={{ width: "40px", height: "45px", }}
+                        src={school.image}
+                        // alt={school.name}
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = "none";
+                        }}
+                      />
+                      <Typography>{school.name}</Typography>
+                    </Stack>
+                  </TableCell>
+                  <TableCell>
+                    <Typography>{school.branch}</Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography>{school.school_admin_name || "-"}</Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography>{school.total_bundles}</Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography >{format(new Date(school.createdAt), "dd MMM yyyy")}</Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={school.is_active ? "Active" : "Inactive"}
+                      size="small"
+                      sx={{
+                        backgroundColor:
+                          school.is_active ? "#D5F8E7" : "#FFF0EE",
+                        color: school.is_active ? "#17B168" : "#EB291B",
+                        fontWeight: 500,
+                        fontSize: "14px",
+                        borderRadius: "12px",
+                        "& .MuiChip-label": {
+                          padding: "6px 10px",
+                        },
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell align="right" onClick={(e) => e.stopPropagation()}>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => handleActionMenuOpen(e, school)}
+                      sx={{
+                        color: "#121318",
+                        padding: "4px",
+                        "&:focus": {
+                          outline: "none !important",
+                        },
+                      }}
+                    >
+                      <MoreActionsIcon />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </TableContainer>
@@ -269,13 +365,13 @@ const Schools: React.FC = () => {
           },
         }}
       >
-        <MenuItem onClick={handleActionMenuClose}>
+        {/* <MenuItem onClick={handleActionMenuClose}>
           <Typography variant="r14">View Details</Typography>
-        </MenuItem>
-        <MenuItem onClick={handleActionMenuClose}>
+        </MenuItem> */}
+        <MenuItem onClick={handleEditSchool}>
           <Typography variant="r14">Edit</Typography>
         </MenuItem>
-        <MenuItem onClick={handleActionMenuClose}>
+        <MenuItem onClick={handleDeleteClick}>
           <Typography variant="r14" sx={{ color: "#E24600" }}>
             Delete
           </Typography>
@@ -287,6 +383,22 @@ const Schools: React.FC = () => {
         open={isAddSchoolDrawerOpen}
         onClose={handleCloseAddSchoolDrawer}
         onSubmit={handleSubmitSchool}
+      />
+
+      <EditSchoolDrawer
+        open={isEditSchoolDrawerOpen}
+        onClose={handleCloseEditSchoolDrawer}
+        school={schoolToEdit}
+        onSubmit={refreshSchools}
+      />
+
+      <DeleteConfirmationModal
+        open={isDeleteModalOpen}
+        onClose={handleCloseDeleteModal}
+        onConfirm={handleConfirmDelete}
+        title="Delete School"
+        description={`Are you sure you want to delete ${schoolToDelete?.name}? This action cannot be undone.`}
+        loading={isDeleting}
       />
     </Box>
   );

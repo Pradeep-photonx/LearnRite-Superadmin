@@ -24,12 +24,16 @@ import type { Bundle } from "../utilities/bundlesData";
 import { MoreActionsIcon } from "../components/icons/CommonIcons";
 import CreateBundleDrawer, { type BundleFormData } from "../components/drawers/CreateBundleDrawer";
 import { schoolsData } from "../utilities/schoolsData";
+import type { School } from "../utilities/schoolsData";
+import BundleDetailsModal from "../components/modals/BundleDetailsModal";
 
 const SchoolBundles: React.FC = () => {
   const [filterAnchor, setFilterAnchor] = useState<null | HTMLElement>(null);
   const [selectedFilter, setSelectedFilter] = useState("All Schools");
   const [actionMenuAnchor, setActionMenuAnchor] = useState<null | HTMLElement>(null);
   const [isCreateBundleDrawerOpen, setIsCreateBundleDrawerOpen] = useState(false);
+  const [isBundleDetailsModalOpen, setIsBundleDetailsModalOpen] = useState(false);
+  const [selectedBundle, setSelectedBundle] = useState<Bundle | null>(null);
 
   const handleFilterOpen = (event: React.MouseEvent<HTMLElement>) => {
     setFilterAnchor(event.currentTarget);
@@ -64,6 +68,26 @@ const SchoolBundles: React.FC = () => {
     // Handle bundle submission
     console.log("Bundle data:", data);
     // You can add API call here to save the bundle data
+  };
+
+  const handleBundleNameClick = (bundle: Bundle) => {
+    setSelectedBundle(bundle);
+    setIsBundleDetailsModalOpen(true);
+  };
+
+  const handleCloseBundleDetailsModal = () => {
+    setIsBundleDetailsModalOpen(false);
+    setSelectedBundle(null);
+  };
+
+  const handleEditBundle = () => {
+    // Handle edit bundle action
+    console.log("Edit bundle:", selectedBundle);
+    // You can open the create bundle drawer in edit mode here
+  };
+
+  const getSchoolForBundle = (bundle: Bundle): School | null => {
+    return schoolsData.find((school) => school.id === bundle.schoolId) || null;
   };
 
   return (
@@ -348,8 +372,17 @@ const SchoolBundles: React.FC = () => {
             {bundlesData.map((bundle: Bundle) => (
               <TableRow key={bundle.id}>
                 <TableCell>
-                  <Stack spacing={0.5}>
-                    <Typography  sx={{ fontWeight: 500 }}>
+                  <Stack
+                    spacing={0.5}
+                    onClick={() => handleBundleNameClick(bundle)}
+                    sx={{
+                      cursor: "pointer",
+                      "&:hover": {
+                        opacity: 0.8,
+                      },
+                    }}
+                  >
+                    <Typography sx={{ fontWeight: 500 }}>
                       {bundle.bundleName}
                     </Typography>
                     <Typography variant="m12" sx={{ color: "#787E91" }}>
@@ -441,6 +474,15 @@ const SchoolBundles: React.FC = () => {
         open={isCreateBundleDrawerOpen}
         onClose={handleCloseCreateBundleDrawer}
         onSubmit={handleSubmitBundle}
+      />
+
+      {/* Bundle Details Modal */}
+      <BundleDetailsModal
+        open={isBundleDetailsModalOpen}
+        onClose={handleCloseBundleDetailsModal}
+        bundle={selectedBundle}
+        school={selectedBundle ? getSchoolForBundle(selectedBundle) : null}
+        onEdit={handleEditBundle}
       />
     </Box>
   );

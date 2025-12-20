@@ -96,6 +96,18 @@ const mockProducts: ProductData[] = [
   },
 ];
 
+const FormField = styled(Box)({
+  display: "flex",
+  flexDirection: "column",
+  gap: "8px",
+});
+
+const FormLabel = styled(Typography)({
+  fontSize: "15px",
+  fontWeight: 500,
+  color: "#121318",
+});
+
 const CreateBundleDrawer: React.FC<CreateBundleDrawerProps> = ({
   open,
   onClose,
@@ -190,13 +202,13 @@ const CreateBundleDrawer: React.FC<CreateBundleDrawerProps> = ({
       categories: prev.categories.map((cat) =>
         cat.id === categoryId
           ? {
-              ...cat,
-              products: cat.products.map((p) =>
-                p.id === productId
-                  ? { ...p, quantity: Math.max(1, p.quantity + delta) }
-                  : p
-              ),
-            }
+            ...cat,
+            products: cat.products.map((p) =>
+              p.id === productId
+                ? { ...p, quantity: Math.max(1, p.quantity + delta) }
+                : p
+            ),
+          }
           : cat
       ),
     }));
@@ -209,17 +221,7 @@ const CreateBundleDrawer: React.FC<CreateBundleDrawerProps> = ({
     onClose();
   };
 
-  const FormField = styled(Box)({
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-  });
 
-  const FormLabel = styled(Typography)({
-    fontSize: "15px",
-    fontWeight: 500,
-    color: "#121318",
-  });
 
   return (
     <BaseDrawer open={open} onClose={onClose} title="Create School Bundle" width={900}>
@@ -390,7 +392,7 @@ const CreateBundleDrawer: React.FC<CreateBundleDrawerProps> = ({
                     </StyledSelect>
                   </FormField>
                 </Grid>
-                <Grid size={{ xs: 12}}>
+                <Grid size={{ xs: 12 }}>
                   <FormField>
                     <FormLabel>
                       Bundle contents <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
@@ -420,170 +422,170 @@ const CreateBundleDrawer: React.FC<CreateBundleDrawerProps> = ({
                 </Grid>
               </Grid>
               <TableContainer
-                  component={Paper}
-                  elevation={0}
-                  sx={{
-                    borderRadius: "unset !important",
-                    border: "unset !important",
-                    backgroundColor: "unset !important",
-                    boxShadow: "unset !important",
-                    padding: "unset !important",
-                  }}
-                >
-                  <Table>
-                    <TableHead>
-                      <TableRow>
+                component={Paper}
+                elevation={0}
+                sx={{
+                  borderRadius: "unset !important",
+                  border: "unset !important",
+                  backgroundColor: "unset !important",
+                  boxShadow: "unset !important",
+                  padding: "unset !important",
+                }}
+              >
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell
+                        sx={{
+                          backgroundColor: "#FFFFFF",
+                          fontWeight: 500,
+                          fontSize: "14px",
+                          color: "#121318",
+                          borderBottom: "1px solid #E5E7EB",
+                          padding: "12px 16px",
+                        }}
+                      >
+                        Product Name
+                      </TableCell>
+                      <TableCell
+                        align="center"
+                        sx={{
+                          backgroundColor: "#FFFFFF",
+                          fontWeight: 500,
+                          fontSize: "14px",
+                          color: "#121318",
+                          borderBottom: "1px solid #E5E7EB",
+                          padding: "12px 16px",
+                        }}
+                      >
+                        Quantity
+                      </TableCell>
+                      <TableCell
+                        align="right"
+                        sx={{
+                          backgroundColor: "#FFFFFF",
+                          fontWeight: 500,
+                          fontSize: "14px",
+                          color: "#121318",
+                          borderBottom: "1px solid #E5E7EB",
+                          padding: "12px 16px",
+                        }}
+                      >
+                        Actions
+                      </TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {category.products.map((product,) => (
+                      <TableRow
+                        key={product.id}
+                      //   sx={{
+                      //     backgroundColor: "#121318",
+                      //     "&:hover": {
+                      //       backgroundColor: "#121318",
+                      //     },
+                      //   }}
+                      >
                         <TableCell
                           sx={{
-                            backgroundColor: "#FFFFFF",
-                            fontWeight: 500,
-                            fontSize: "14px",
-                            color: "#121318",
-                            borderBottom: "1px solid #E5E7EB",
+                            borderBottom: "1px solid #2A2A2A",
                             padding: "12px 16px",
                           }}
                         >
-                          Product Name
+                          <Stack direction="row" alignItems="center" spacing={1.5}>
+                            {product.productImage && (
+                              <img
+                                src={product.productImage}
+                                alt={product.productName}
+                                style={{
+                                  width: "25px",
+                                  height: "35px",
+                                  objectFit: "contain",
+                                }}
+                              />
+                            )}
+                            <Typography
+                              variant="m16"
+                            >
+                              {product.productName}
+                            </Typography>
+                          </Stack>
                         </TableCell>
                         <TableCell
                           align="center"
                           sx={{
-                            backgroundColor: "#FFFFFF",
-                            fontWeight: 500,
-                            fontSize: "14px",
-                            color: "#121318",
-                            borderBottom: "1px solid #E5E7EB",
+                            borderBottom: "1px solid #2A2A2A",
                             padding: "12px 16px",
                           }}
                         >
-                          Quantity
+                          <Stack direction="row" alignItems="center" spacing={1} justifyContent="center">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleQuantityChange(category.id, product.id, -1)}>
+                              <Remove sx={{ fontSize: "16px", color: "#121318" }} />
+                            </IconButton>
+                            <TextField
+                              type="number"
+                              value={product.quantity}
+                              onChange={(e) => {
+                                const value = parseInt(e.target.value) || 1;
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  categories: prev.categories.map((cat) =>
+                                    cat.id === category.id
+                                      ? {
+                                        ...cat,
+                                        products: cat.products.map((p) =>
+                                          p.id === product.id ? { ...p, quantity: Math.max(1, value) } : p
+                                        ),
+                                      }
+                                      : cat
+                                  ),
+                                }));
+                              }}
+                              inputProps={{
+                                style: {
+                                  textAlign: "center",
+                                  padding: "8px",
+                                },
+                                min: 1,
+                              }}
+                              sx={{
+                                width: "60px",
+                                "& .MuiOutlinedInput-root": {
+                                  borderRadius: "8px",
+                                  height: "32px",
+                                  boxShadow: "none !important",
+                                  border: "1px solid#1213181A",
+                                },
+                              }}
+                            />
+                            <IconButton
+                              size="small"
+                              onClick={() => handleQuantityChange(category.id, product.id, 1)}
+                            >
+                              <Add sx={{ fontSize: "16px", color: "#121318" }} />
+                            </IconButton>
+                          </Stack>
                         </TableCell>
                         <TableCell
                           align="right"
                           sx={{
-                            backgroundColor: "#FFFFFF",
-                            fontWeight: 500,
-                            fontSize: "14px",
-                            color: "#121318",
-                            borderBottom: "1px solid #E5E7EB",
+                            borderBottom: "1px solid #2A2A2A",
                             padding: "12px 16px",
                           }}
                         >
-                          Actions
+                          <IconButton
+                            onClick={() => handleDeleteProduct(category.id, product.id)}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
                         </TableCell>
                       </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {category.products.map((product,) => (
-                        <TableRow
-                          key={product.id}
-                        //   sx={{
-                        //     backgroundColor: "#121318",
-                        //     "&:hover": {
-                        //       backgroundColor: "#121318",
-                        //     },
-                        //   }}
-                        >
-                          <TableCell
-                            sx={{
-                              borderBottom: "1px solid #2A2A2A",
-                              padding: "12px 16px",
-                            }}
-                          >
-                            <Stack direction="row" alignItems="center" spacing={1.5}>
-                              {product.productImage && (
-                                <img
-                                  src={product.productImage}
-                                  alt={product.productName}
-                                  style={{
-                                    width: "25px",
-                                    height: "35px",
-                                    objectFit: "contain",
-                                  }}
-                                />
-                              )}
-                              <Typography
-                                variant="m16"
-                              >
-                                {product.productName}
-                              </Typography>
-                            </Stack>
-                          </TableCell>
-                          <TableCell
-                            align="center"
-                            sx={{
-                              borderBottom: "1px solid #2A2A2A",
-                              padding: "12px 16px",
-                            }}
-                          >
-                              <Stack direction="row" alignItems="center" spacing={1} justifyContent="center">
-                                <IconButton
-                                  size="small"
-                                  onClick={() => handleQuantityChange(category.id, product.id, -1)}>
-                                  <Remove sx={{ fontSize: "16px", color: "#121318" }} />
-                                </IconButton>
-                                <TextField
-                                  type="number"
-                                  value={product.quantity}
-                                  onChange={(e) => {
-                                    const value = parseInt(e.target.value) || 1;
-                                    setFormData((prev) => ({
-                                      ...prev,
-                                      categories: prev.categories.map((cat) =>
-                                        cat.id === category.id
-                                          ? {
-                                              ...cat,
-                                              products: cat.products.map((p) =>
-                                                p.id === product.id ? { ...p, quantity: Math.max(1, value) } : p
-                                              ),
-                                            }
-                                          : cat
-                                      ),
-                                    }));
-                                  }}
-                                  inputProps={{
-                                    style: {
-                                      textAlign: "center",
-                                      padding: "8px",
-                                    },
-                                    min: 1,
-                                  }}
-                                  sx={{
-                                    width: "60px",
-                                    "& .MuiOutlinedInput-root": {
-                                      borderRadius: "8px",
-                                      height: "32px",
-                                      boxShadow: "none !important",
-                                      border: "1px solid#1213181A",
-                                    },
-                                  }}
-                                />
-                                <IconButton
-                                  size="small"
-                                  onClick={() => handleQuantityChange(category.id, product.id, 1)}
-                                  >
-                                  <Add sx={{ fontSize: "16px", color: "#121318" }} />
-                                </IconButton>
-                              </Stack>
-                          </TableCell>
-                          <TableCell
-                            align="right"
-                            sx={{
-                              borderBottom: "1px solid #2A2A2A",
-                              padding: "12px 16px",
-                            }}
-                          >
-                            <IconButton
-                              onClick={() => handleDeleteProduct(category.id, product.id)}
-                            >
-                              <DeleteIcon  />
-                            </IconButton>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
 
             </Box>
           ))}
@@ -597,7 +599,7 @@ const CreateBundleDrawer: React.FC<CreateBundleDrawerProps> = ({
               color: "#787E91",
               textTransform: "none",
               width: "100%",
-            //   marginTop: "16px",
+              //   marginTop: "16px",
               "&:hover": {
                 borderColor: "#CFCDCD66",
                 backgroundColor: "#F9FAFB",

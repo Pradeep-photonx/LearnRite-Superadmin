@@ -5,5 +5,9 @@ export type { SchoolFormData } from "./AddSchoolDrawer";
 export { default as CreateBundleDrawer } from "./CreateBundleDrawer";
 export type { BundleFormData, CategoryData, ProductData } from "./CreateBundleDrawer";
 export { default as BundleDetailsModal } from "../modals/BundleDetailsModal";
+export { default as CreateProductDrawer } from "./CreateProductDrawer";
+export type { ProductFormData } from "./CreateProductDrawer";
+export { default as CreateCategoryDrawer } from "./CreateCategoryDrawer";
+export type { CategoryFormData } from "./CreateCategoryDrawer";
 
 

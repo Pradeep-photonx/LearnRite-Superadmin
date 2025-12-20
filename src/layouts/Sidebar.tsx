@@ -112,7 +112,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
       {/* Navigation Items */}
       <List
         sx={{
-          padding: isCollapsed ? "16px 8px" : "16px 12px",
+          padding: isCollapsed ? "10px 0px" : "10px 0px",
           flex: 1,
           "& .MuiListItem-root": {
             marginBottom: "4px",

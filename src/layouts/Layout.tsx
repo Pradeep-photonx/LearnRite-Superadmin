@@ -22,7 +22,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       sx={{
         display: "flex",
         minHeight: "100vh",
-        // backgroundColor: "#F9FAFB",
+        backgroundColor: "#F9FAFB",
       }}
     >
       {/* Sidebar */}
