@@ -20,13 +20,14 @@ import {
 } from "@mui/material";
 import { Add, KeyboardArrowDown } from "@mui/icons-material";
 import { MoreActionsIcon } from "../components/icons/CommonIcons";
-import CreateBundleDrawer from "../components/drawers/CreateBundleDrawer";
-import EditBundleDrawer from "../components/drawers/EditBundleDrawer";
 import BundleDetailsModal from "../components/modals/BundleDetailsModal";
-import { getBundleList, type Bundle } from "../api/bundle";
+import ConfirmDeleteBundleModal from "../components/modals/ConfirmDeleteBundleModal";
+import { getBundleList, deleteBundle, type Bundle } from "../api/bundle";
 import { getSchoolList, type School } from "../api/school";
-import { getClassList, type Class } from "../api/class";
+// Removed unused class imports
 import { notifyError } from "../utils/toastUtils";
+import { CreateBundleDrawer } from "../components/drawers";
+import EditBundleDrawer from "../components/drawers/EditBundleDrawer";
 
 const SchoolBundles: React.FC = () => {
   const [filterAnchor, setFilterAnchor] = useState<null | HTMLElement>(null);
@@ -38,22 +39,21 @@ const SchoolBundles: React.FC = () => {
   const [isCreateBundleDrawerOpen, setIsCreateBundleDrawerOpen] = useState(false);
   const [isEditBundleDrawerOpen, setIsEditBundleDrawerOpen] = useState(false);
   const [isBundleDetailsModalOpen, setIsBundleDetailsModalOpen] = useState(false);
-  const [selectedBundle, setSelectedBundle] = useState<(Bundle & { allProducts?: Bundle[] }) | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [selectedBundle, setSelectedBundle] = useState<Bundle | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [bundles, setBundles] = useState<Bundle[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
-  const [classes, setClasses] = useState<Class[]>([]);
 
   const fetchData = async () => {
     try {
-      const [bundlesRes, schoolsRes, classesRes] = await Promise.all([
+      const [bundlesRes, schoolsRes] = await Promise.all([
         getBundleList(),
         getSchoolList(),
-        getClassList(),
       ]);
       setBundles(bundlesRes.rows);
       setSchools(schoolsRes.rows);
-      setClasses(classesRes.rows);
     } catch (error) {
       notifyError(error);
     }
@@ -77,29 +77,9 @@ const SchoolBundles: React.FC = () => {
   };
 
   const displayBundles = React.useMemo(() => {
-    const grouped = new Map<number, Bundle & { allProducts: Bundle[] }>();
-
-    const filtered = selectedFilter.id === "all"
+    return selectedFilter.id === "all"
       ? bundles
       : bundles.filter((bundle) => bundle.school_id === Number(selectedFilter.id));
-
-    filtered.forEach(b => {
-      if (!grouped.has(b.class_bundle_id)) {
-        grouped.set(b.class_bundle_id, { ...b, allProducts: [] });
-      }
-      grouped.get(b.class_bundle_id)!.allProducts.push(b);
-    });
-
-    return Array.from(grouped.values()).map(gb => {
-      // Aggregating total price and item count
-      const totalPrice = gb.allProducts.reduce((acc, p) => acc + (Number(p.total_price) || 0), 0);
-      const totalItems = gb.allProducts.length;
-      return {
-        ...gb,
-        total_bundle_price: totalPrice,
-        total_items_count: totalItems
-      };
-    });
   }, [bundles, selectedFilter]);
 
   const handleActionMenuOpen = (event: React.MouseEvent<HTMLElement>, bundle: Bundle) => {
@@ -144,12 +124,32 @@ const SchoolBundles: React.FC = () => {
     setSelectedBundle(null);
   };
 
-  const getSchoolName = (schoolId: number): string => {
-    return schools.find((s) => s.school_id === schoolId)?.name || "N/A";
+  const handleOpenDeleteModal = () => {
+    setIsDeleteModalOpen(true);
+    handleActionMenuClose();
   };
 
-  const getClassName = (classId: number): string => {
-    return classes.find((c) => c.class_id === classId)?.name || "N/A";
+  const handleDeleteConfirm = async () => {
+    if (!selectedBundle) return;
+    setIsDeleting(true);
+    try {
+      await deleteBundle(selectedBundle.bundle_id);
+      await fetchData();
+      setIsDeleteModalOpen(false);
+      setSelectedBundle(null);
+    } catch (error) {
+      notifyError(error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const getSchoolName = (bundle: Bundle): string => {
+    return bundle.School?.name || "N/A";
+  };
+
+  const getClassName = (bundle: Bundle): string => {
+    return bundle.Class?.name || "N/A";
   };
 
   return (
@@ -429,7 +429,7 @@ const SchoolBundles: React.FC = () => {
           </TableHead>
           <TableBody>
             {displayBundles.map((bundle) => (
-              <TableRow key={bundle.class_bundle_id}>
+              <TableRow key={bundle.bundle_id}>
                 <TableCell>
                   <Stack
                     spacing={0.5}
@@ -445,18 +445,18 @@ const SchoolBundles: React.FC = () => {
                       {bundle.name}
                     </Typography>
                     <Typography variant="m12" sx={{ color: "#787E91" }}>
-                      ID : {bundle.class_bundle_id}
+                      ID : {bundle.bundle_id}
                     </Typography>
                   </Stack>
                 </TableCell>
                 <TableCell>
-                  <Typography>{getSchoolName(bundle.school_id)}</Typography>
+                  <Typography>{getSchoolName(bundle)}</Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography>{getClassName(bundle.class_id)}</Typography>
+                  <Typography>{getClassName(bundle)}</Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography>{bundle.total_items_count}</Typography>
+                  <Typography>{bundle.total_products}</Typography>
                 </TableCell>
                 <TableCell>
                   <Typography variant="r16" sx={{ fontWeight: 500 }}>
@@ -524,7 +524,7 @@ const SchoolBundles: React.FC = () => {
         <MenuItem onClick={handleEditBundle}>
           <Typography variant="r14">Edit</Typography>
         </MenuItem>
-        <MenuItem onClick={handleActionMenuClose}>
+        <MenuItem onClick={handleOpenDeleteModal}>
           <Typography variant="r14" sx={{ color: "#E24600" }}>
             Delete
           </Typography>
@@ -553,6 +553,13 @@ const SchoolBundles: React.FC = () => {
         onClose={handleCloseEditBundleDrawer}
         onSubmit={handleSubmitBundle}
         bundle={selectedBundle}
+      />
+      <ConfirmDeleteBundleModal
+        open={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleDeleteConfirm}
+        bundleName={selectedBundle?.name || ""}
+        loading={isDeleting}
       />
     </Box>
   );

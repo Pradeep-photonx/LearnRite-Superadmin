@@ -21,7 +21,13 @@ export interface SchoolAdmin {
     school_admin_id: number;
     name: string;
     email: string;
+    mobile_number: string;
     is_active: boolean;
+}
+
+export interface SchoolAdminListResponse {
+    count?: number;
+    rows: SchoolAdmin[];
 }
 
 export interface School {
@@ -53,6 +59,13 @@ export interface UpdateSchoolPayload {
     admission_id?: boolean;
 }
 
+export interface AdminUpdatePayload {
+    name: string;
+    email: string;
+    status: string;
+    mobile_number: string;
+}
+
 export interface SchoolListResponse {
     count: number;
     rows: School[];
@@ -70,5 +83,20 @@ export const updateSchool = async (id: number, data: UpdateSchoolPayload) => {
 
 export const deleteSchool = async (id: number) => {
     const response = await axiosClient.delete(`/School/delete/${id}`);
+    return response.data;
+};
+
+export const getSchoolDetail = async (id: number) => {
+    const response = await axiosClient.get<{ row: School }>(`/School/view/${id}`);
+    return response.data;
+};
+
+export const getSchoolAdminList = async (schoolId: number) => {
+    const response = await axiosClient.get<SchoolAdminListResponse>(`/SchoolAdmin/list/${schoolId}`);
+    return response.data;
+};
+
+export const updateSchoolAdmin = async (adminId: number, data: AdminUpdatePayload) => {
+    const response = await axiosClient.patch(`/SchoolAdmin/update/${adminId}`, data);
     return response.data;
 };

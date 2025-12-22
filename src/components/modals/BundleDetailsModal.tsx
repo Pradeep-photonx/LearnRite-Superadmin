@@ -14,7 +14,7 @@ import {
 } from "@mui/material";
 import { KeyboardArrowUp, KeyboardArrowDown } from "@mui/icons-material";
 import { CloseIcon } from "../icons/CommonIcons";
-import type { Bundle } from "../../api/bundle";
+import { getBundleDetail, type Bundle } from "../../api/bundle";
 import type { School } from "../../api/school";
 
 interface BundleDetailsModalProps {
@@ -31,6 +31,7 @@ interface ItemData {
   quantity: number;
   price: number;
   image?: string;
+  is_mandatory: boolean;
 }
 
 interface CategorySection {
@@ -58,44 +59,46 @@ const BundleDetailsModal: React.FC<BundleDetailsModalProps> = ({
 
   React.useEffect(() => {
     const fetchItemDetails = async () => {
-      if (!bundle || !bundle.allProducts) return;
+      if (!bundle?.bundle_id) return;
 
       setLoading(true);
       try {
-        const { getProductList } = await import("../../api/product");
-        const productsData = await getProductList();
-        const allProducts = productsData.rows;
+        const detail = await getBundleDetail(bundle.bundle_id);
 
-        const groupedSections: Record<string, ItemData[]> = {};
+        const commonBooks: ItemData[] = [];
+        const stationary: ItemData[] = [];
 
-        bundle.allProducts.forEach(bp => {
-          const productRow = allProducts.find(row => row.Category.SubCategory.Product.product_id === bp.product_id);
-          if (productRow) {
-            const catName = productRow.Category.name;
-            if (!groupedSections[catName]) {
-              groupedSections[catName] = [];
-            }
-            groupedSections[catName].push({
-              id: bp.product_id.toString(),
-              name: productRow.Category.SubCategory.Product.name,
-              quantity: bp.quantity,
-              price: bp.price,
-              image: productRow.Category.SubCategory.Product.images?.[0]
-            });
+        detail.allProducts.forEach((bp: any) => {
+          const item: ItemData = {
+            id: bp.product_id.toString(),
+            name: bp.Product.name,
+            quantity: bp.quantity,
+            price: bp.price,
+            image: bp.Product.images?.[0],
+            is_mandatory: bp.is_mandatory === 1
+          };
+
+          if (item.is_mandatory) {
+            commonBooks.push(item);
+          } else {
+            stationary.push(item);
           }
         });
 
-        const sectionList = Object.entries(groupedSections).map(([name, items]) => ({
-          name,
-          items
-        }));
+        const sectionList: CategorySection[] = [];
+        if (commonBooks.length > 0) {
+          sectionList.push({ name: "Common books", items: commonBooks });
+        }
+        if (stationary.length > 0) {
+          sectionList.push({ name: "Stationary", items: stationary });
+        }
 
         setSections(sectionList);
 
-        // Auto-expand first section
-        if (sectionList.length > 0) {
-          setExpandedSections(prev => ({ ...prev, [sectionList[0].name]: true }));
-        }
+        // Auto-expand sections
+        const initialExpanded: { [key: string]: boolean } = {};
+        sectionList.forEach(s => initialExpanded[s.name] = true);
+        setExpandedSections(initialExpanded);
       } catch (error) {
         console.error("Failed to fetch product details for modal", error);
       } finally {
@@ -106,7 +109,7 @@ const BundleDetailsModal: React.FC<BundleDetailsModalProps> = ({
     if (open) {
       fetchItemDetails();
     }
-  }, [open, bundle]);
+  }, [open, bundle?.bundle_id]);
 
   if (!bundle || !school) {
     return null;
@@ -177,7 +180,7 @@ const BundleDetailsModal: React.FC<BundleDetailsModalProps> = ({
                 </Stack>
                 <Stack spacing={0.5} alignItems="flex-end">
                   <Typography variant="sb24" sx={{ color: "#155DFC" }}>
-                    ₹ {bundle.total_bundle_price || bundle.total_price}/-
+                    ₹ {bundle.total_bundle_price}/-
                   </Typography>
                   <Typography variant="r14" sx={{ color: "text.secondary" }}>
                     inc of all taxes
@@ -290,7 +293,7 @@ const BundleDetailsModal: React.FC<BundleDetailsModalProps> = ({
           )}
 
           {/* Action Buttons */}
-          <Stack
+          {/* <Stack
             direction="row"
             spacing={2}
             justifyContent="flex-end"
@@ -329,7 +332,7 @@ const BundleDetailsModal: React.FC<BundleDetailsModalProps> = ({
             >
               Edit Bundle
             </Button>
-          </Stack>
+          </Stack> */}
         </Stack>
       </DialogContent>
     </Dialog>

@@ -35,7 +35,7 @@ interface EditBundleDrawerProps {
     open: boolean;
     onClose: () => void;
     onSubmit?: () => void;
-    bundle: (Bundle & { allProducts?: Bundle[]; total_items_count?: number; total_bundle_price?: number }) | null;
+    bundle: Bundle | null;
 }
 
 export interface BundleFormData {
@@ -142,72 +142,84 @@ const EditBundleDrawer: React.FC<EditBundleDrawerProps> = ({
 
             const allProductsList = productsData.rows;
 
-            // Pre-populate grouped bundles if they exist
-            if (bundle && bundle.allProducts) {
-                const categorySections: Record<string, CategoryData> = {};
-                const uniqueCats = new Set<string>();
-                const uniqueSections = new Set<string>();
-
-                bundle.allProducts.forEach(bp => {
-                    const productRow = allProductsList.find(row => row.Category.SubCategory.Product.product_id === bp.product_id);
-                    if (productRow) {
-                        const catId = productRow.Category.category_id.toString();
-                        const subCatId = productRow.Category.SubCategory.sub_category_id.toString();
-                        const sectionKey = `${catId}-${subCatId}`;
-
-                        if (!categorySections[sectionKey]) {
-                            categorySections[sectionKey] = {
-                                id: sectionKey,
-                                category: catId,
-                                subCategory: subCatId,
-                                products: []
-                            };
-                        }
-
-                        categorySections[sectionKey].products.push({
-                            id: bp.product_id.toString(),
-                            product_id: bp.product_id,
-                            productName: productRow.Category.SubCategory.Product.name,
-                            productImage: productRow.Category.SubCategory.Product.images?.[0] || "",
-                            quantity: bp.quantity,
-                            is_mandatory: bp.is_mandatory ? 1 : 0
-                        });
-
-                        uniqueCats.add(catId);
-                        uniqueSections.add(sectionKey);
-                    }
-                });
-
-                // Load all necessary subcategories and products for the maps
-                const subCatData: Record<string, SubCategory[]> = {};
-                const productDataMap: Record<string, ProductListRow[]> = {};
-
-                await Promise.all(Array.from(uniqueCats).map(async (catId) => {
-                    const data = await getSubCategoryList(Number(catId));
-                    subCatData[catId] = data.rows;
-                }));
-
-                // For simplicity in edit mode, since we already have allProductsList, we can filter it locally
-                Array.from(uniqueSections).forEach(key => {
-                    const [catId, subCatId] = key.split("-");
-                    productDataMap[key] = allProductsList.filter(row =>
-                        row.Category.category_id === Number(catId) &&
-                        row.Category.SubCategory.sub_category_id === Number(subCatId)
-                    );
-                });
-
-                setSubCategoriesMap(subCatData);
-                setProductsMap(productDataMap);
-
-                setFormData({
+            if (bundle) {
+                const baseFormData = {
                     bundleName: bundle.name,
                     school_id: bundle.school_id.toString(),
                     class_id: bundle.class_id.toString(),
                     cl_id: bundle.cl_id.toString(),
-                    categories: Object.values(categorySections).length > 0
-                        ? Object.values(categorySections)
-                        : [{ id: "1", category: "", subCategory: "", products: [] }]
-                });
+                };
+
+                // Pre-populate grouped bundles if they exist (legacy or if added to bundle object)
+                if ((bundle as any).allProducts) {
+                    const categorySections: Record<string, CategoryData> = {};
+                    const uniqueCats = new Set<string>();
+                    const uniqueSections = new Set<string>();
+
+                    (bundle as any).allProducts.forEach((bp: any) => {
+                        const productRow = allProductsList.find(row => row.Category.SubCategory.Product.product_id === bp.product_id);
+                        if (productRow) {
+                            const catId = productRow.Category.category_id.toString();
+                            const subCatId = productRow.Category.SubCategory.sub_category_id.toString();
+                            const sectionKey = `${catId}-${subCatId}`;
+
+                            if (!categorySections[sectionKey]) {
+                                categorySections[sectionKey] = {
+                                    id: sectionKey,
+                                    category: catId,
+                                    subCategory: subCatId,
+                                    products: []
+                                };
+                            }
+
+                            categorySections[sectionKey].products.push({
+                                id: bp.product_id.toString(),
+                                product_id: bp.product_id,
+                                productName: productRow.Category.SubCategory.Product.name,
+                                productImage: productRow.Category.SubCategory.Product.images?.[0] || "",
+                                quantity: bp.quantity,
+                                is_mandatory: bp.is_mandatory ? 1 : 0
+                            });
+
+                            uniqueCats.add(catId);
+                            uniqueSections.add(sectionKey);
+                        }
+                    });
+
+                    // Load all necessary subcategories and products for the maps
+                    const subCatData: Record<string, SubCategory[]> = {};
+                    const productDataMap: Record<string, ProductListRow[]> = {};
+
+                    await Promise.all(Array.from(uniqueCats).map(async (catId) => {
+                        const data = await getSubCategoryList(Number(catId));
+                        subCatData[catId] = data.rows;
+                    }));
+
+                    Array.from(uniqueSections).forEach(key => {
+                        const [catId, subCatId] = key.split("-");
+                        productDataMap[key] = allProductsList.filter(row =>
+                            row.Category.category_id === Number(catId) &&
+                            row.Category.SubCategory.sub_category_id === Number(subCatId)
+                        );
+                    });
+
+                    setSubCategoriesMap(subCatData);
+                    setProductsMap(productDataMap);
+
+                    setFormData({
+                        ...baseFormData,
+                        categories: Object.values(categorySections).length > 0
+                            ? Object.values(categorySections)
+                            : [{ id: "1", category: "", subCategory: "", products: [] }]
+                    });
+                } else {
+                    // Just set basic info if no products are provided in the list
+                    setFormData(prev => ({
+                        ...prev,
+                        ...baseFormData,
+                        categories: [{ id: "1", category: "", subCategory: "", products: [] }]
+                    }));
+                }
             }
         } catch (error) {
             notifyError(error);
@@ -235,7 +247,12 @@ const EditBundleDrawer: React.FC<EditBundleDrawerProps> = ({
         if (!subCategoryId || productsMap[key]) return;
         try {
             const data = await getProductList();
-            setProductsMap(prev => ({ ...prev, [key]: data.rows }));
+            // Filter products by category and subcategory
+            const filteredProducts = data.rows.filter(row =>
+                row.Category.category_id === Number(categoryId) &&
+                row.Category.SubCategory.sub_category_id === Number(subCategoryId)
+            );
+            setProductsMap(prev => ({ ...prev, [key]: filteredProducts }));
         } catch (error) {
             notifyError(error);
         }
@@ -394,15 +411,14 @@ const EditBundleDrawer: React.FC<EditBundleDrawerProps> = ({
         }
 
         const payload: UpdateBundlePayload = {
-            class_bundle_id: bundle.class_bundle_id,
-            class_id: Number(formData.class_id),
-            cl_id: Number(formData.cl_id),
+            new_school_id: Number(formData.school_id),
+            name: formData.bundleName,
             products: allProducts,
         };
 
         try {
             setIsSubmitting(true);
-            await updateBundle(payload);
+            await updateBundle(bundle.bundle_id, payload);
             notifySuccess("Bundle updated successfully");
             if (onSubmit) {
                 onSubmit();
@@ -451,7 +467,7 @@ const EditBundleDrawer: React.FC<EditBundleDrawerProps> = ({
                         <Grid size={{ xs: 12, md: 6 }}>
                             <FormField>
                                 <FormLabel>
-                                    Class <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
+                                    Class (Read Only)
                                 </FormLabel>
                                 <StyledSelect
                                     value={formData.class_id}
@@ -459,6 +475,7 @@ const EditBundleDrawer: React.FC<EditBundleDrawerProps> = ({
                                     variant="outlined"
                                     fullWidth
                                     displayEmpty
+                                    disabled
                                 >
                                     <MenuItem value="" disabled>Select Class</MenuItem>
                                     {classes.map((cls) => (
@@ -472,7 +489,7 @@ const EditBundleDrawer: React.FC<EditBundleDrawerProps> = ({
                         <Grid size={{ xs: 12, md: 6 }}>
                             <FormField>
                                 <FormLabel>
-                                    Languages <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
+                                    Languages (Read Only)
                                 </FormLabel>
                                 <StyledSelect
                                     value={formData.cl_id}
@@ -480,6 +497,7 @@ const EditBundleDrawer: React.FC<EditBundleDrawerProps> = ({
                                     variant="outlined"
                                     fullWidth
                                     displayEmpty
+                                    disabled
                                 >
                                     <MenuItem value="" disabled>Select language</MenuItem>
                                     {languages.map((lang) => (

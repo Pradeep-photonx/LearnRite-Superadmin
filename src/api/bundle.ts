@@ -15,20 +15,24 @@ export interface CreateBundlePayload {
 }
 
 export interface Bundle {
-    class_bundle_id: number;
-    class_id: number;
+    bundle_id: string;
     name: string;
-    school_id: number;
+    class_id: number;
     cl_id: number;
-    product_id: number;
-    quantity: number;
-    price: number;
-    total_price: number;
-    is_mandatory: boolean;
+    school_id: number;
     is_active: boolean;
-    is_delete: boolean;
+    total_products: number;
+    total_bundle_price: number;
     createdAt: string;
-    updatedAt: string;
+    Class: {
+        name: string;
+    };
+    ClassLanguage: {
+        language: string;
+    };
+    School: {
+        name: string;
+    };
 }
 
 export interface BundleListResponse {
@@ -36,24 +40,50 @@ export interface BundleListResponse {
     rows: Bundle[];
 }
 
-export interface UpdateBundlePayload {
-    class_bundle_id: number;
+export interface BundleDetailResponse {
+    bundle_id: string;
+    name: string;
     class_id: number;
     cl_id: number;
+    school_id: number;
+    is_active: boolean;
+    total_bundle_price: number;
+    allProducts: (BundleProduct & {
+        price: number;
+        Product: {
+            name: string;
+            images: string[];
+        }
+    })[];
+}
+
+export interface UpdateBundlePayload {
+    new_school_id: number;
+    name: string;
     products: BundleProduct[];
 }
 
 export const createBundle = async (data: CreateBundlePayload) => {
-    const response = await axiosClient.post("/ClassBundle/create", data);
+    const response = await axiosClient.post("ClassBundle/create", data);
     return response.data;
 };
 
-export const updateBundle = async (data: UpdateBundlePayload) => {
-    const response = await axiosClient.put("/ClassBundle/update", data);
+export const updateBundle = async (bundleId: string, data: UpdateBundlePayload) => {
+    const response = await axiosClient.put(`ClassBundle/update/${bundleId}`, data);
     return response.data;
 };
 
 export const getBundleList = async () => {
-    const response = await axiosClient.get<BundleListResponse>("/ClassBundle/list");
+    const response = await axiosClient.get<BundleListResponse>("ClassBundle/list");
+    return response.data;
+};
+
+export const getBundleDetail = async (bundleId: string) => {
+    const response = await axiosClient.get<BundleDetailResponse>(`ClassBundle/view/${bundleId}`);
+    return response.data;
+};
+
+export const deleteBundle = async (bundleId: string) => {
+    const response = await axiosClient.delete(`ClassBundle/delete/${bundleId}`);
     return response.data;
 };

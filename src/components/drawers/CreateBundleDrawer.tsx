@@ -170,9 +170,13 @@ const CreateBundleDrawer: React.FC<CreateBundleDrawerProps> = ({
     const key = `${categoryId}-${subCategoryId}`;
     if (!subCategoryId || productsMap[key]) return;
     try {
-      const data = await getProductList(); // This API seems to return all products, you might need to filter or use a specific API if available
-      // For now, let's filter if needed or just store all and filter in UI
-      setProductsMap(prev => ({ ...prev, [key]: data.rows }));
+      const data = await getProductList();
+      // Filter products by category and subcategory
+      const filteredProducts = data.rows.filter(row =>
+        row.Category.category_id === Number(categoryId) &&
+        row.Category.SubCategory.sub_category_id === Number(subCategoryId)
+      );
+      setProductsMap(prev => ({ ...prev, [key]: filteredProducts }));
     } catch (error) {
       notifyError(error);
     }
