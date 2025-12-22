@@ -19,21 +19,49 @@ import {
   CardContent,
 } from "@mui/material";
 import { Add, KeyboardArrowDown } from "@mui/icons-material";
-import { bundlesData } from "../utilities/bundlesData";
-import type { Bundle } from "../utilities/bundlesData";
 import { MoreActionsIcon } from "../components/icons/CommonIcons";
-import CreateBundleDrawer, { type BundleFormData } from "../components/drawers/CreateBundleDrawer";
-import { schoolsData } from "../utilities/schoolsData";
-import type { School } from "../utilities/schoolsData";
+import CreateBundleDrawer from "../components/drawers/CreateBundleDrawer";
+import EditBundleDrawer from "../components/drawers/EditBundleDrawer";
 import BundleDetailsModal from "../components/modals/BundleDetailsModal";
+import { getBundleList, type Bundle } from "../api/bundle";
+import { getSchoolList, type School } from "../api/school";
+import { getClassList, type Class } from "../api/class";
+import { notifyError } from "../utils/toastUtils";
 
 const SchoolBundles: React.FC = () => {
   const [filterAnchor, setFilterAnchor] = useState<null | HTMLElement>(null);
-  const [selectedFilter, setSelectedFilter] = useState("All Schools");
+  const [selectedFilter, setSelectedFilter] = useState<{ id: string | number; name: string }>({
+    id: "all",
+    name: "All Schools",
+  });
   const [actionMenuAnchor, setActionMenuAnchor] = useState<null | HTMLElement>(null);
   const [isCreateBundleDrawerOpen, setIsCreateBundleDrawerOpen] = useState(false);
+  const [isEditBundleDrawerOpen, setIsEditBundleDrawerOpen] = useState(false);
   const [isBundleDetailsModalOpen, setIsBundleDetailsModalOpen] = useState(false);
-  const [selectedBundle, setSelectedBundle] = useState<Bundle | null>(null);
+  const [selectedBundle, setSelectedBundle] = useState<(Bundle & { allProducts?: Bundle[] }) | null>(null);
+
+  const [bundles, setBundles] = useState<Bundle[]>([]);
+  const [schools, setSchools] = useState<School[]>([]);
+  const [classes, setClasses] = useState<Class[]>([]);
+
+  const fetchData = async () => {
+    try {
+      const [bundlesRes, schoolsRes, classesRes] = await Promise.all([
+        getBundleList(),
+        getSchoolList(),
+        getClassList(),
+      ]);
+      setBundles(bundlesRes.rows);
+      setSchools(schoolsRes.rows);
+      setClasses(classesRes.rows);
+    } catch (error) {
+      notifyError(error);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchData();
+  }, []);
 
   const handleFilterOpen = (event: React.MouseEvent<HTMLElement>) => {
     setFilterAnchor(event.currentTarget);
@@ -43,13 +71,40 @@ const SchoolBundles: React.FC = () => {
     setFilterAnchor(null);
   };
 
-  const handleFilterSelect = (filter: string) => {
-    setSelectedFilter(filter);
+  const handleFilterSelect = (schoolId: string | number, schoolName: string) => {
+    setSelectedFilter({ id: schoolId, name: schoolName });
     setFilterAnchor(null);
   };
 
-  const handleActionMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+  const displayBundles = React.useMemo(() => {
+    const grouped = new Map<number, Bundle & { allProducts: Bundle[] }>();
+
+    const filtered = selectedFilter.id === "all"
+      ? bundles
+      : bundles.filter((bundle) => bundle.school_id === Number(selectedFilter.id));
+
+    filtered.forEach(b => {
+      if (!grouped.has(b.class_bundle_id)) {
+        grouped.set(b.class_bundle_id, { ...b, allProducts: [] });
+      }
+      grouped.get(b.class_bundle_id)!.allProducts.push(b);
+    });
+
+    return Array.from(grouped.values()).map(gb => {
+      // Aggregating total price and item count
+      const totalPrice = gb.allProducts.reduce((acc, p) => acc + (Number(p.total_price) || 0), 0);
+      const totalItems = gb.allProducts.length;
+      return {
+        ...gb,
+        total_bundle_price: totalPrice,
+        total_items_count: totalItems
+      };
+    });
+  }, [bundles, selectedFilter]);
+
+  const handleActionMenuOpen = (event: React.MouseEvent<HTMLElement>, bundle: Bundle) => {
     setActionMenuAnchor(event.currentTarget);
+    setSelectedBundle(bundle);
   };
 
   const handleActionMenuClose = () => {
@@ -64,10 +119,9 @@ const SchoolBundles: React.FC = () => {
     setIsCreateBundleDrawerOpen(false);
   };
 
-  const handleSubmitBundle = (data: BundleFormData) => {
-    // Handle bundle submission
-    console.log("Bundle data:", data);
-    // You can add API call here to save the bundle data
+  const handleSubmitBundle = async () => {
+    // Refresh the list after successful creation
+    await fetchData();
   };
 
   const handleBundleNameClick = (bundle: Bundle) => {
@@ -81,13 +135,21 @@ const SchoolBundles: React.FC = () => {
   };
 
   const handleEditBundle = () => {
-    // Handle edit bundle action
-    console.log("Edit bundle:", selectedBundle);
-    // You can open the create bundle drawer in edit mode here
+    setIsEditBundleDrawerOpen(true);
+    handleActionMenuClose();
   };
 
-  const getSchoolForBundle = (bundle: Bundle): School | null => {
-    return schoolsData.find((school) => school.id === bundle.schoolId) || null;
+  const handleCloseEditBundleDrawer = () => {
+    setIsEditBundleDrawerOpen(false);
+    setSelectedBundle(null);
+  };
+
+  const getSchoolName = (schoolId: number): string => {
+    return schools.find((s) => s.school_id === schoolId)?.name || "N/A";
+  };
+
+  const getClassName = (classId: number): string => {
+    return classes.find((c) => c.class_id === classId)?.name || "N/A";
   };
 
   return (
@@ -116,7 +178,7 @@ const SchoolBundles: React.FC = () => {
               },
             }}
           >
-            {selectedFilter}
+            {selectedFilter.name}
           </Button>
 
           {/* Create Bundle Button */}
@@ -143,23 +205,20 @@ const SchoolBundles: React.FC = () => {
             }}
           >
             <MenuItem
-              onClick={() => handleFilterSelect("All Schools")}
-              selected={selectedFilter === "All Schools"}
+              onClick={() => handleFilterSelect("all", "All Schools")}
+              selected={selectedFilter.id === "all"}
             >
               <Typography variant="r14">All Schools</Typography>
             </MenuItem>
-            <MenuItem
-              onClick={() => handleFilterSelect("Active Schools")}
-              selected={selectedFilter === "Active Schools"}
-            >
-              <Typography variant="r14">Delhi Public Schools</Typography>
-            </MenuItem>
-            <MenuItem
-              onClick={() => handleFilterSelect("Inactive Schools")}
-              selected={selectedFilter === "Inactive Schools"}
-            >
-              <Typography variant="r14">Mumbai Public Schools</Typography>
-            </MenuItem>
+            {schools.map((school) => (
+              <MenuItem
+                key={school.school_id}
+                onClick={() => handleFilterSelect(school.school_id, school.name)}
+                selected={selectedFilter.id === school.school_id}
+              >
+                <Typography variant="r14">{school.name}</Typography>
+              </MenuItem>
+            ))}
           </Menu>
         </Stack>
       </Stack>
@@ -203,7 +262,7 @@ const SchoolBundles: React.FC = () => {
                   Total Bundles
                 </Typography>
                 <Typography variant="sb26">
-                  {bundlesData.length}
+                  {displayBundles.length}
                 </Typography>
               </Stack>
             </Stack>
@@ -247,7 +306,7 @@ const SchoolBundles: React.FC = () => {
                   Active Bundles
                 </Typography>
                 <Typography variant="sb26">
-                  {bundlesData.filter((b) => b.status === "Active").length}
+                  {displayBundles.filter((b) => b.is_active).length}
                 </Typography>
               </Stack>
             </Stack>
@@ -292,7 +351,7 @@ const SchoolBundles: React.FC = () => {
                   Total Schools
                 </Typography>
                 <Typography variant="sb26">
-                  {schoolsData.length}
+                  {schools.length}
                 </Typography>
               </Stack>
             </Stack>
@@ -361,7 +420,7 @@ const SchoolBundles: React.FC = () => {
             >
               <TableCell>Bundle Name</TableCell>
               <TableCell>School</TableCell>
-              <TableCell>Class/Grade</TableCell>
+              <TableCell>Class</TableCell>
               <TableCell>Items</TableCell>
               <TableCell>Price</TableCell>
               <TableCell>Status</TableCell>
@@ -369,8 +428,8 @@ const SchoolBundles: React.FC = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {bundlesData.map((bundle: Bundle) => (
-              <TableRow key={bundle.id}>
+            {displayBundles.map((bundle) => (
+              <TableRow key={bundle.class_bundle_id}>
                 <TableCell>
                   <Stack
                     spacing={0.5}
@@ -383,35 +442,35 @@ const SchoolBundles: React.FC = () => {
                     }}
                   >
                     <Typography sx={{ fontWeight: 500 }}>
-                      {bundle.bundleName}
+                      {bundle.name}
                     </Typography>
                     <Typography variant="m12" sx={{ color: "#787E91" }}>
-                      ID : {bundle.bundleId}
+                      ID : {bundle.class_bundle_id}
                     </Typography>
                   </Stack>
                 </TableCell>
                 <TableCell>
-                  <Typography>{bundle.schoolName || "N/A"}</Typography>
+                  <Typography>{getSchoolName(bundle.school_id)}</Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography>{bundle.classGrade || bundle.bundleName}</Typography>
+                  <Typography>{getClassName(bundle.class_id)}</Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography>{bundle.totalItems}</Typography>
+                  <Typography>{bundle.total_items_count}</Typography>
                 </TableCell>
                 <TableCell>
                   <Typography variant="r16" sx={{ fontWeight: 500 }}>
-                    {bundle.price}
+                    ₹ {bundle.total_bundle_price}/-
                   </Typography>
                 </TableCell>
                 <TableCell>
                   <Chip
-                    label={bundle.status}
+                    label={bundle.is_active ? "Active" : "Inactive"}
                     size="small"
                     sx={{
                       backgroundColor:
-                        bundle.status === "Active" ? "#D5F8E7" : "#FFF0EE",
-                      color: bundle.status === "Active" ? "#17B168" : "#EB291B",
+                        bundle.is_active ? "#D5F8E7" : "#FFF0EE",
+                      color: bundle.is_active ? "#17B168" : "#EB291B",
                       fontWeight: 500,
                       fontSize: "14px",
                       borderRadius: "12px",
@@ -424,7 +483,7 @@ const SchoolBundles: React.FC = () => {
                 <TableCell align="right">
                   <IconButton
                     size="small"
-                    onClick={handleActionMenuOpen}
+                    onClick={(e) => handleActionMenuOpen(e, bundle)}
                     sx={{
                       color: "#121318",
                       padding: "4px",
@@ -456,10 +515,13 @@ const SchoolBundles: React.FC = () => {
           },
         }}
       >
-        <MenuItem onClick={handleActionMenuClose}>
+        <MenuItem onClick={() => {
+          setIsBundleDetailsModalOpen(true);
+          handleActionMenuClose();
+        }}>
           <Typography variant="r14">View Details</Typography>
         </MenuItem>
-        <MenuItem onClick={handleActionMenuClose}>
+        <MenuItem onClick={handleEditBundle}>
           <Typography variant="r14">Edit</Typography>
         </MenuItem>
         <MenuItem onClick={handleActionMenuClose}>
@@ -481,8 +543,16 @@ const SchoolBundles: React.FC = () => {
         open={isBundleDetailsModalOpen}
         onClose={handleCloseBundleDetailsModal}
         bundle={selectedBundle}
-        school={selectedBundle ? getSchoolForBundle(selectedBundle) : null}
+        school={selectedBundle ? schools.find(s => s.school_id === selectedBundle.school_id) || null : null}
         onEdit={handleEditBundle}
+      />
+
+      {/* Edit Bundle Drawer */}
+      <EditBundleDrawer
+        open={isEditBundleDrawerOpen}
+        onClose={handleCloseEditBundleDrawer}
+        onSubmit={handleSubmitBundle}
+        bundle={selectedBundle}
       />
     </Box>
   );

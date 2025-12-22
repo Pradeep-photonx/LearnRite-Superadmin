@@ -18,19 +18,27 @@ import {
   MenuItem,
   Tabs,
   Tab,
+  CircularProgress,
 } from "@mui/material";
+
+
 import { Add, ArrowBack } from "@mui/icons-material";
-import { productsData } from "../utilities/productsData";
-import type { Product } from "../utilities/productsData";
 import { MoreActionsIcon } from "../components/icons/CommonIcons";
 import CreateProductDrawer, { type ProductFormData } from "../components/drawers/CreateProductDrawer";
+import EditProductDrawer from "../components/drawers/EditProductDrawer";
 import CreateCategoryDrawer from "../components/drawers/CreateCategoryDrawer";
 import CreateSubCategoryDrawer from "../components/drawers/CreateSubCategoryDrawer";
+import CreateBrandDrawer from "../components/drawers/CreateBrandDrawer";
 import EditCategoryDrawer from "../components/drawers/EditCategoryDrawer";
 import EditSubCategoryDrawer from "../components/drawers/EditSubCategoryDrawer";
+import EditBrandDrawer from "../components/drawers/EditBundleDrawer";
 import DeleteConfirmationModal from "../components/modals/DeleteConfirmationModal";
 import { getCategoryList, deleteCategory, getSubCategoryList, deleteSubCategory, type Category, type SubCategory } from "../api/category";
+import { getBrandList, deleteBrand, type Brand } from "../api/brand";
+import { getProductList, deleteProduct, type ProductListRow } from "../api/product";
+
 import { notifyError, notifySuccess } from "../utils/toastUtils";
+
 
 const Products: React.FC = () => {
   const { categorySlug } = useParams<{ categorySlug?: string }>();
@@ -38,6 +46,7 @@ const Products: React.FC = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [actionMenuAnchor, setActionMenuAnchor] = useState<null | HTMLElement>(null);
   const [isCreateProductDrawerOpen, setIsCreateProductDrawerOpen] = useState(false);
+  const [isEditProductDrawerOpen, setIsEditProductDrawerOpen] = useState(false);
   const [isCreateCategoryDrawerOpen, setIsCreateCategoryDrawerOpen] = useState(false);
   const [isCreateSubCategoryDrawerOpen, setIsCreateSubCategoryDrawerOpen] = useState(false);
   const [isEditCategoryDrawerOpen, setIsEditCategoryDrawerOpen] = useState(false);
@@ -48,12 +57,28 @@ const Products: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [productToEdit, setProductToEdit] = useState<any | null>(null);
   const [subCategories, setSubCategories] = useState<SubCategory[]>([]);
   const [loadingSubCategories, setLoadingSubCategories] = useState(false);
   const [subCategoryToEdit, setSubCategoryToEdit] = useState<SubCategory | null>(null);
   const [isEditSubCategoryDrawerOpen, setIsEditSubCategoryDrawerOpen] = useState(false);
   const [subCategoryToDelete, setSubCategoryToDelete] = useState<SubCategory | null>(null);
   const [isDeleteSubCategoryModalOpen, setIsDeleteSubCategoryModalOpen] = useState(false);
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [loadingBrands, setLoadingBrands] = useState(false);
+  const [isCreateBrandDrawerOpen, setIsCreateBrandDrawerOpen] = useState(false);
+  const [brandToEdit, setBrandToEdit] = useState<Brand | null>(null);
+  const [isEditBrandDrawerOpen, setIsEditBrandDrawerOpen] = useState(false);
+  const [brandToDelete, setBrandToDelete] = useState<Brand | null>(null);
+  const [isDeleteBrandModalOpen, setIsDeleteBrandModalOpen] = useState(false);
+  const [products, setProducts] = useState<ProductListRow[]>([]);
+
+  const [loadingProducts, setLoadingProducts] = useState(false);
+
+  const [activeMenuProduct, setActiveMenuProduct] = useState<any | null>(null);
+  const [isDeleteProductModalOpen, setIsDeleteProductModalOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<any | null>(null);
+
 
   // Helper function to create URL-friendly slug from category name
   const createSlug = (name: string) => {
@@ -72,10 +97,40 @@ const Products: React.FC = () => {
     }
   };
 
+  const fetchBrands = async () => {
+    try {
+      setLoadingBrands(true);
+      const data = await getBrandList();
+      setBrands(data.rows);
+    } catch (error) {
+      notifyError(error);
+    } finally {
+      setLoadingBrands(false);
+    }
+  };
+
+  const fetchProducts = async () => {
+    try {
+      setLoadingProducts(true);
+      const data = await getProductList();
+      setProducts(data.rows);
+    } catch (error) {
+      notifyError(error);
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
+
   React.useEffect(() => {
     if (activeTab === 0) {
       fetchCategories();
+    } else if (activeTab === 1) {
+      fetchProducts();
+    } else if (activeTab === 2) {
+      fetchBrands();
     }
+
   }, [activeTab]);
 
   // Restore selected category from URL on mount
@@ -96,8 +151,9 @@ const Products: React.FC = () => {
 
   const [activeMenuCategory, setActiveMenuCategory] = useState<Category | null>(null);
   const [activeMenuSubCategory, setActiveMenuSubCategory] = useState<SubCategory | null>(null);
+  const [activeMenuBrand, setActiveMenuBrand] = useState<Brand | null>(null);
 
-  const handleActionMenuOpen = (event: React.MouseEvent<HTMLElement>, category?: Category, subCategory?: SubCategory) => {
+  const handleActionMenuOpen = (event: React.MouseEvent<HTMLElement>, category?: Category, subCategory?: SubCategory, brand?: Brand, product?: any) => {
     setActionMenuAnchor(event.currentTarget);
     if (category) {
       setActiveMenuCategory(category);
@@ -105,12 +161,20 @@ const Products: React.FC = () => {
     if (subCategory) {
       setActiveMenuSubCategory(subCategory);
     }
+    if (brand) {
+      setActiveMenuBrand(brand);
+    }
+    if (product) {
+      setActiveMenuProduct(product);
+    }
   };
 
   const handleActionMenuClose = () => {
     setActionMenuAnchor(null);
     setActiveMenuCategory(null);
     setActiveMenuSubCategory(null);
+    setActiveMenuBrand(null);
+    setActiveMenuProduct(null);
   };
 
   const handleEditCategory = () => {
@@ -129,6 +193,22 @@ const Products: React.FC = () => {
     handleActionMenuClose();
   };
 
+  const handleEditBrand = () => {
+    if (activeMenuBrand) {
+      setBrandToEdit(activeMenuBrand);
+      setIsEditBrandDrawerOpen(true);
+    }
+    handleActionMenuClose();
+  };
+
+  const handleEditProduct = () => {
+    if (activeMenuProduct) {
+      setProductToEdit(activeMenuProduct);
+      setIsEditProductDrawerOpen(true);
+    }
+    handleActionMenuClose();
+  };
+
   const handleCloseEditCategoryDrawer = () => {
     setIsEditCategoryDrawerOpen(false);
     setCategoryToEdit(null);
@@ -137,6 +217,27 @@ const Products: React.FC = () => {
   const handleCloseEditSubCategoryDrawer = () => {
     setIsEditSubCategoryDrawerOpen(false);
     setSubCategoryToEdit(null);
+  };
+
+  const handleCloseEditBrandDrawer = () => {
+    setIsEditBrandDrawerOpen(false);
+    setBrandToEdit(null);
+  };
+
+  const handleDeleteBrandClick = () => {
+    if (activeMenuBrand) {
+      setBrandToDelete(activeMenuBrand);
+      setIsDeleteBrandModalOpen(true);
+    }
+    handleActionMenuClose();
+  };
+
+  const handleDeleteProductClick = () => {
+    if (activeMenuProduct) {
+      setProductToDelete(activeMenuProduct);
+      setIsDeleteProductModalOpen(true);
+    }
+    handleActionMenuClose();
   };
 
   const handleDeleteCategoryClick = () => {
@@ -163,6 +264,16 @@ const Products: React.FC = () => {
   const handleCloseDeleteSubCategoryModal = () => {
     setIsDeleteSubCategoryModalOpen(false);
     setSubCategoryToDelete(null);
+  };
+
+  const handleCloseDeleteBrandModal = () => {
+    setIsDeleteBrandModalOpen(false);
+    setBrandToDelete(null);
+  };
+
+  const handleCloseDeleteProductModal = () => {
+    setIsDeleteProductModalOpen(false);
+    setProductToDelete(null);
   };
 
   const handleConfirmDeleteCategory = async () => {
@@ -211,6 +322,39 @@ const Products: React.FC = () => {
     }
   };
 
+  const handleConfirmDeleteBrand = async () => {
+    if (brandToDelete) {
+      try {
+        setIsDeleting(true);
+        await deleteBrand(brandToDelete.brand_id);
+        notifySuccess("Brand deleted successfully");
+        handleCloseDeleteBrandModal();
+        fetchBrands();
+      } catch (error) {
+        notifyError(error);
+      } finally {
+        setIsDeleting(false);
+      }
+    }
+  };
+
+  const handleConfirmDeleteProduct = async () => {
+    if (productToDelete) {
+      try {
+        setIsDeleting(true);
+        const productData = productToDelete.Category.SubCategory.Product;
+        await deleteProduct(productData.product_id);
+        notifySuccess("Product deleted successfully");
+        handleCloseDeleteProductModal();
+        fetchProducts();
+      } catch (error) {
+        notifyError(error);
+      } finally {
+        setIsDeleting(false);
+      }
+    }
+  };
+
   const handleCategoryClick = async (category: Category) => {
     setSelectedCategory(category);
     setLoadingSubCategories(true);
@@ -237,6 +381,8 @@ const Products: React.FC = () => {
   const handleAddProduct = () => {
     if (activeTab === 1) {
       setIsCreateProductDrawerOpen(true);
+    } else if (activeTab === 2) {
+      setIsCreateBrandDrawerOpen(true);
     } else if (selectedCategory) {
       setIsCreateSubCategoryDrawerOpen(true);
     } else {
@@ -248,6 +394,11 @@ const Products: React.FC = () => {
     setIsCreateProductDrawerOpen(false);
   };
 
+  const handleCloseEditProductDrawer = () => {
+    setIsEditProductDrawerOpen(false);
+    setProductToEdit(null);
+  };
+
   const handleCloseCreateCategoryDrawer = () => {
     setIsCreateCategoryDrawerOpen(false);
   };
@@ -256,11 +407,14 @@ const Products: React.FC = () => {
     setIsCreateSubCategoryDrawerOpen(false);
   };
 
-  const handleSubmitProduct = (data: ProductFormData) => {
-    // Handle product submission
-    console.log("Product data:", data);
-    // You can add API call here to save the product data
+  const handleCloseCreateBrandDrawer = () => {
+    setIsCreateBrandDrawerOpen(false);
   };
+
+  const handleSubmitProduct = (data: ProductFormData) => {
+    fetchProducts();
+  };
+
 
   const handleSubmitCategory = () => {
     fetchCategories();
@@ -281,6 +435,18 @@ const Products: React.FC = () => {
     if (selectedCategory) {
       handleCategoryClick(selectedCategory);
     }
+  };
+
+  const handleSubmitBrand = () => {
+    fetchBrands();
+  };
+
+  const handleUpdateBrand = () => {
+    fetchBrands();
+  };
+
+  const handleUpdateProduct = () => {
+    fetchProducts();
   };
 
   return (
@@ -380,6 +546,7 @@ const Products: React.FC = () => {
           >
             <Tab label="Categories" />
             <Tab label="Products" />
+            <Tab label="Brands" />
           </Tabs>
         </Box>
       )}
@@ -402,98 +569,122 @@ const Products: React.FC = () => {
             <TableHead>
               <TableRow>
                 <TableCell>Product Name</TableCell>
-                <TableCell>SKU</TableCell>
                 <TableCell>Category</TableCell>
-                <TableCell>Current Stock</TableCell>
-                <TableCell>Price</TableCell>
+                <TableCell>Sub Category</TableCell>
+                <TableCell>Stock</TableCell>
+                <TableCell>MRP</TableCell>
+                <TableCell>Selling Price</TableCell>
+                <TableCell>Discount</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell align="right">Actions</TableCell>
+
               </TableRow>
             </TableHead>
             <TableBody>
-              {productsData.map((product: Product) => (
-                <TableRow key={product.id}>
-                  <TableCell>
-                    <Stack direction="row" alignItems="center" spacing={1.5}>
-                      {product.productImage && (
-                        <img
-                          src={product.productImage}
-                          alt={product.productName}
-                          style={{
-                            width: "40px",
-                            height: "40px",
-                            borderRadius: "8px",
-                            objectFit: "cover",
+              {loadingProducts ? (
+                <TableRow>
+                  <TableCell colSpan={9} align="center">Loading Products...</TableCell>
+                </TableRow>
+              ) : products.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} align="center">No Products Found</TableCell>
+                </TableRow>
+              ) : (
+                products.map((row: ProductListRow) => {
+                  const product = row.Category.SubCategory.Product;
+                  const categoryName = row.Category.name;
+                  const subCategoryName = row.Category.SubCategory.name;
+
+                  return (
+                    <TableRow key={product.product_id}>
+                      <TableCell>
+                        <Stack direction="row" alignItems="center" spacing={1.5}>
+                          {product.images && product.images.length > 0 && (
+                            <img
+                              src={product.images[0]}
+                              // alt={product.name}
+                              style={{
+                                width: "40px",
+                                height: "40px",
+                                borderRadius: "8px",
+                                objectFit: "cover",
+                              }}
+                            />
+                          )}
+
+                          <Typography sx={{ fontWeight: 500 }}>
+                            {product.name}
+                          </Typography>
+                        </Stack>
+                      </TableCell>
+                      <TableCell>
+                        <Typography>{categoryName}</Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography>{subCategoryName}</Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography>{product.stock_quantity}</Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography>{product.mrp}</Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography>{product.selling_price}</Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography>{product.discount_percentage}%</Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={product.is_active ? "Active" : "Inactive"}
+                          size="small"
+                          sx={{
+                            backgroundColor:
+                              product.is_active
+                                ? "#D5F8E7"
+                                : "#FFF0EE",
+                            color:
+                              product.is_active
+                                ? "#17B168"
+                                : "#EB291B",
+                            fontWeight: 500,
+                            fontSize: "14px",
+                            borderRadius: "12px",
+                            textTransform: "capitalize",
+                            "& .MuiChip-label": {
+                              padding: "6px 10px",
+                            },
                           }}
                         />
-                      )}
-                      <Typography sx={{ fontWeight: 500 }}>
-                        {product.productName}
-                      </Typography>
-                    </Stack>
-                  </TableCell>
-                  <TableCell>
-                    <Typography>{product.sku}</Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography>{product.category}</Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography>{product.currentStock}</Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography sx={{ fontWeight: 500 }}>
-                      {product.price}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={product.status}
-                      size="small"
-                      sx={{
-                        backgroundColor:
-                          product.status === "In stock"
-                            ? "#D5F8E7"
-                            : product.status === "low stock"
-                              ? "#FFF0EE"
-                              : "#F3F4F6",
-                        color:
-                          product.status === "In stock"
-                            ? "#17B168"
-                            : product.status === "low stock"
-                              ? "#EB291B"
-                              : "#6B7280",
-                        fontWeight: 500,
-                        fontSize: "14px",
-                        borderRadius: "12px",
-                        textTransform: "capitalize",
-                        "& .MuiChip-label": {
-                          padding: "6px 10px",
-                        },
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell align="right">
-                    <IconButton
-                      size="small"
-                      onClick={handleActionMenuOpen}
-                      sx={{
-                        color: "#121318",
-                        padding: "4px",
-                        "&:focus": {
-                          outline: "none !important",
-                        },
-                      }}
-                    >
-                      <MoreActionsIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
+                      </TableCell>
+
+                      <TableCell align="right">
+                        <IconButton
+                          size="small"
+                          onClick={(e) => handleActionMenuOpen(e, undefined, undefined, undefined, row)}
+                          sx={{
+                            color: "#121318",
+                            padding: "4px",
+                            "&:focus": {
+                              outline: "none !important",
+                            },
+                          }}
+                        >
+                          <MoreActionsIcon />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+
+
             </TableBody>
           </Table>
         </TableContainer>
       )}
+
 
       {activeTab === 0 && !selectedCategory && (
         <Box
@@ -631,7 +822,7 @@ const Products: React.FC = () => {
                   </TableRow>
                 ) : (
                   subCategories.map((subCategory: SubCategory) => (
-                    <TableRow key={subCategory.subcategory_id}>
+                    <TableRow key={subCategory.sub_category_id}>
                       <TableCell>
                         <Typography sx={{ fontWeight: 500 }}>
                           {subCategory.name}
@@ -684,6 +875,87 @@ const Products: React.FC = () => {
         </Box>
       )}
 
+      {/* Brands Tab */}
+      {activeTab === 2 && (
+        <TableContainer
+          component={Paper}
+          elevation={0}
+          sx={{
+            borderRadius: "12px",
+            border: "unset !important",
+            backgroundColor: "unset !important",
+            boxShadow: "unset !important",
+            padding: "0",
+            marginTop: "20px",
+          }}
+        >
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Brand Name</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Created On</TableCell>
+                <TableCell align="right">Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {loadingBrands ? (
+                <TableRow>
+                  <TableCell colSpan={4} align="center">
+                    <CircularProgress size={24} />
+                  </TableCell>
+                </TableRow>
+              ) : brands.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} align="center">
+                    No Brands Found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                brands.map((brand) => (
+                  <TableRow key={brand.brand_id}>
+                    <TableCell>{brand.name}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={brand.is_active ? "Active" : "Inactive"}
+                        size="small"
+                        sx={{
+                          color: brand.is_active ? "#17B168" : "#EB291B",
+                          backgroundColor: brand.is_active ? "#D5F8E7" : "#FFF0EE",
+                          borderRadius: "12px",
+                          textTransform: "capitalize",
+                          "& .MuiChip-label": {
+                            padding: "6px 10px",
+                          },
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {new Date(brand.createdAt).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell align="right">
+                      <IconButton
+                        size="small"
+                        onClick={(e) => handleActionMenuOpen(e, undefined, undefined, brand)}
+                        sx={{
+                          color: "#121318",
+                          padding: "4px",
+                          "&:focus": {
+                            outline: "none !important",
+                          },
+                        }}
+                      >
+                        <MoreActionsIcon />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+
       {/* Action Menu */}
       <Menu
         anchorEl={actionMenuAnchor}
@@ -698,10 +970,10 @@ const Products: React.FC = () => {
           },
         }}
       >
-        <MenuItem onClick={activeMenuSubCategory ? handleEditSubCategory : handleEditCategory}>
+        <MenuItem onClick={activeMenuBrand ? handleEditBrand : (activeMenuSubCategory ? handleEditSubCategory : (activeMenuProduct ? handleEditProduct : handleEditCategory))}>
           <Typography variant="r14">Edit</Typography>
         </MenuItem>
-        <MenuItem onClick={activeMenuSubCategory ? handleDeleteSubCategoryClick : handleDeleteCategoryClick}>
+        <MenuItem onClick={activeMenuBrand ? handleDeleteBrandClick : (activeMenuSubCategory ? handleDeleteSubCategoryClick : (activeMenuProduct ? handleDeleteProductClick : handleDeleteCategoryClick))}>
           <Typography variant="r14" sx={{ color: "#E24600" }}>
             Delete
           </Typography>
@@ -742,11 +1014,28 @@ const Products: React.FC = () => {
         loading={isDeleting}
       />
 
+      <DeleteConfirmationModal
+        open={isDeleteBrandModalOpen}
+        onClose={handleCloseDeleteBrandModal}
+        onConfirm={handleConfirmDeleteBrand}
+        title="Delete Brand"
+        description={`Are you sure you want to delete ${brandToDelete?.name}? This action cannot be undone.`}
+        loading={isDeleting}
+      />
+
       {/* Create Product Drawer */}
       <CreateProductDrawer
         open={isCreateProductDrawerOpen}
         onClose={handleCloseCreateProductDrawer}
         onSubmit={handleSubmitProduct}
+      />
+
+      {/* Edit Product Drawer */}
+      <EditProductDrawer
+        open={isEditProductDrawerOpen}
+        onClose={handleCloseEditProductDrawer}
+        product={productToEdit?.Category?.SubCategory?.Product || null}
+        onSubmit={handleUpdateProduct}
       />
 
       {/* Create Category Drawer */}
@@ -762,6 +1051,29 @@ const Products: React.FC = () => {
         onClose={handleCloseCreateSubCategoryDrawer}
         onSubmit={handleSubmitSubCategory}
         parentCategory={selectedCategory}
+      />
+
+      {/* Create Brand Drawer */}
+      <CreateBrandDrawer
+        open={isCreateBrandDrawerOpen}
+        onClose={handleCloseCreateBrandDrawer}
+        onSubmit={handleSubmitBrand}
+      />
+
+      {/* Edit Brand Drawer */}
+      <EditBrandDrawer
+        open={isEditBrandDrawerOpen}
+        onClose={handleCloseEditBrandDrawer}
+        onSubmit={handleUpdateBrand}
+        brand={brandToEdit}
+      />
+      <DeleteConfirmationModal
+        open={isDeleteProductModalOpen}
+        onClose={handleCloseDeleteProductModal}
+        onConfirm={handleConfirmDeleteProduct}
+        title="Delete Product"
+        description={`Are you sure you want to delete ${productToDelete?.Category.SubCategory.Product.name}? This action cannot be undone.`}
+        loading={isDeleting}
       />
     </Box>
   );

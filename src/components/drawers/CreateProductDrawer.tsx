@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   TextField,
@@ -9,8 +9,17 @@ import {
   MenuItem,
   styled,
   Grid,
+  IconButton,
+  CircularProgress,
 } from "@mui/material";
+import { Close, CloudUpload } from "@mui/icons-material";
 import BaseDrawer from "./BaseDrawer";
+import { getCategoryList, getSubCategoryList, type Category, type SubCategory } from "../../api/category";
+import { getBrandList, type Brand } from "../../api/brand";
+import { createProduct, type CreateProductPayload } from "../../api/product";
+import { notifyError, notifySuccess } from "../../utils/toastUtils";
+import { fileToBase64, compressImage } from "../../utils/fileUtils";
+
 
 interface CreateProductDrawerProps {
   open: boolean;
@@ -20,14 +29,17 @@ interface CreateProductDrawerProps {
 
 export interface ProductFormData {
   productName: string;
-  productSKU: string;
+  // productSKU: string;
   category: string;
   productType: string;
+  brand: string;
   productDescription: string;
-  price: string;
-  discountPrice: string;
+  mrp: string;
+  sellingPrice: string;
+  discountPercentage: string;
   stockQuantity: string;
-  stockStatus: string;
+  status: string;
+
   images?: File[];
 }
 
@@ -58,9 +70,8 @@ const StyledSelect = styled(Select)({
 });
 
 // Mock data for dropdowns
-const categoryOptions = ["Notebooks", "Pens", "Pencils", "Books", "Art Supplies", "Lab Equipment"];
-const productTypeOptions = ["Physical", "Digital", "Service"];
-const stockStatusOptions = ["In stock", "low stock", "Out of stock"];
+const statusOptions = ["Active", "Inactive"];
+
 
 const FormField = styled(Box)({
   display: "flex",
@@ -81,16 +92,27 @@ const CreateProductDrawer: React.FC<CreateProductDrawerProps> = ({
 }) => {
   const [formData, setFormData] = useState<ProductFormData>({
     productName: "",
-    productSKU: "",
+    // productSKU: "",
     category: "",
     productType: "",
+    brand: "",
     productDescription: "",
-    price: "",
-    discountPrice: "",
+    mrp: "",
+    sellingPrice: "",
+    discountPercentage: "",
     stockQuantity: "",
-    stockStatus: "",
+    status: "",
+
     images: [],
   });
+
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [subCategories, setSubCategories] = useState<SubCategory[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+  const [loadingSubCategories, setLoadingSubCategories] = useState(false);
+  const [loadingBrands, setLoadingBrands] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
 
@@ -108,6 +130,13 @@ const CreateProductDrawer: React.FC<CreateProductDrawerProps> = ({
     const files = event.target.files;
     if (files) {
       const fileArray = Array.from(files);
+      const currentImagesCount = formData.images?.length || 0;
+
+      if (currentImagesCount + fileArray.length > 5) {
+        notifyError("You can only upload a maximum of 5 images.");
+        return;
+      }
+
       setFormData((prev) => ({
         ...prev,
         images: [...(prev.images || []), ...fileArray],
@@ -119,23 +148,150 @@ const CreateProductDrawer: React.FC<CreateProductDrawerProps> = ({
     }
   };
 
-  // const handleRemoveImage = (index: number) => {
-  //   setFormData((prev) => ({
-  //     ...prev,
-  //     images: prev.images?.filter((_, i) => i !== index) || [],
-  //   }));
-  //   setImagePreviews((prev) => {
-  //     const newPreviews = [...prev];
-  //     URL.revokeObjectURL(newPreviews[index]);
-  //     return newPreviews.filter((_, i) => i !== index);
-  //   });
-  // };
+  const handleRemoveImage = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      images: prev.images?.filter((_, i) => i !== index) || [],
+    }));
+    setImagePreviews((prev) => {
+      const newPreviews = [...prev];
+      URL.revokeObjectURL(newPreviews[index]);
+      return newPreviews.filter((_, i) => i !== index);
+    });
+  };
 
-  const handleSubmit = () => {
-    if (onSubmit) {
-      onSubmit(formData);
+  const fetchCategories = async () => {
+    try {
+      setLoadingCategories(true);
+      const data = await getCategoryList();
+      setCategories(data.rows);
+    } catch (error) {
+      notifyError(error);
+    } finally {
+      setLoadingCategories(false);
     }
-    onClose();
+  };
+
+  const fetchSubCategories = async (categoryId: number) => {
+    try {
+      setLoadingSubCategories(true);
+      const data = await getSubCategoryList(categoryId);
+      setSubCategories(data.rows);
+    } catch (error) {
+      notifyError(error);
+    } finally {
+      setLoadingSubCategories(false);
+    }
+  };
+
+  const fetchBrands = async () => {
+    try {
+      setLoadingBrands(true);
+      const data = await getBrandList();
+      setBrands(data.rows);
+    } catch (error) {
+      notifyError(error);
+    } finally {
+      setLoadingBrands(false);
+    }
+  };
+
+  useEffect(() => {
+    if (open) {
+      fetchCategories();
+      fetchBrands();
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (formData.category) {
+      fetchSubCategories(Number(formData.category));
+      // Reset subcategory when category changes
+      setFormData(prev => ({ ...prev, productType: "" }));
+    } else {
+      setSubCategories([]);
+    }
+  }, [formData.category]);
+
+  useEffect(() => {
+    const mrp = parseFloat(formData.mrp);
+    const sellingPrice = parseFloat(formData.sellingPrice);
+
+    if (!isNaN(mrp) && !isNaN(sellingPrice) && mrp > 0) {
+      const discount = ((mrp - sellingPrice) / mrp) * 100;
+      setFormData((prev) => ({
+        ...prev,
+        discountPercentage: discount > 0 ? discount.toFixed(2) : "0.00",
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        discountPercentage: "",
+      }));
+    }
+  }, [formData.mrp, formData.sellingPrice]);
+
+  const handleSubmit = async () => {
+    // Validation
+    if (!formData.productName || !formData.category || !formData.productType || !formData.productDescription || !formData.mrp || !formData.sellingPrice || !formData.stockQuantity || !formData.status) {
+
+      notifyError("Please fill in all required fields");
+      return;
+    }
+
+    if (!formData.images || formData.images.length === 0) {
+      notifyError("Please upload at least one product image.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Compress images aggressively (0.4 quality, 800px max width) and then convert to base64
+      const compressedImages = await Promise.all((formData.images || []).map(file => compressImage(file, 0.4, 800)));
+
+      const base64Images = await Promise.all(compressedImages.map(file => fileToBase64(file)));
+
+      // Diagnostic logging for payload size
+      const imageSizes = base64Images.map(img => (img.length / 1024).toFixed(2) + " KB");
+      const totalSize = (JSON.stringify(base64Images).length / 1024).toFixed(2);
+      console.log("Image sizes:", imageSizes);
+      console.log("Total images size:", totalSize + " KB");
+
+      const payload: CreateProductPayload = {
+        category_id: Number(formData.category),
+        sub_category_id: Number(formData.productType),
+        brand_id: Number(formData.brand),
+        name: formData.productName,
+        description: formData.productDescription,
+        image1: base64Images[0] || "",
+        image2: base64Images[1] || "",
+        image3: base64Images[2] || "",
+        image4: base64Images[3] || "",
+        image5: base64Images[4] || "",
+        mrp: Number(formData.mrp),
+        selling_price: Number(formData.sellingPrice),
+        discount_percentage: Number(formData.discountPercentage),
+        stock_quantity: Number(formData.stockQuantity),
+        is_active: formData.status === "Active",
+      };
+
+      console.log("Final Payload Size (approx):", (JSON.stringify(payload).length / 1024).toFixed(2) + " KB");
+
+
+
+
+      await createProduct(payload);
+      notifySuccess("Product created successfully");
+
+      if (onSubmit) {
+        onSubmit(formData);
+      }
+      onClose();
+    } catch (error: any) {
+      notifyError(error.response?.data?.message || "Failed to create product");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
 
@@ -160,7 +316,7 @@ const CreateProductDrawer: React.FC<CreateProductDrawerProps> = ({
                 />
               </FormField>
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
+            {/* <Grid size={{ xs: 12, md: 6 }}>
               <FormField>
                 <FormLabel>
                   Product SKU <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
@@ -173,7 +329,7 @@ const CreateProductDrawer: React.FC<CreateProductDrawerProps> = ({
                   fullWidth
                 />
               </FormField>
-            </Grid>
+            </Grid> */}
             <Grid size={{ xs: 12, md: 6 }}>
               <FormField>
                 <FormLabel>
@@ -187,11 +343,11 @@ const CreateProductDrawer: React.FC<CreateProductDrawerProps> = ({
                   displayEmpty
                 >
                   <MenuItem value="" disabled>
-                    Select category
+                    {loadingCategories ? "Loading categories..." : "Select Category"}
                   </MenuItem>
-                  {categoryOptions.map((cat) => (
-                    <MenuItem key={cat} value={cat}>
-                      {cat}
+                  {categories.map((cat) => (
+                    <MenuItem key={cat.category_id} value={cat.category_id.toString()}>
+                      {cat.name}
                     </MenuItem>
                   ))}
                 </StyledSelect>
@@ -200,7 +356,7 @@ const CreateProductDrawer: React.FC<CreateProductDrawerProps> = ({
             <Grid size={{ xs: 12, md: 6 }}>
               <FormField>
                 <FormLabel>
-                  Product Type <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
+                  Sub Category <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
                 </FormLabel>
                 <StyledSelect
                   value={formData.productType}
@@ -210,11 +366,34 @@ const CreateProductDrawer: React.FC<CreateProductDrawerProps> = ({
                   displayEmpty
                 >
                   <MenuItem value="" disabled>
-                    Select product type
+                    {loadingSubCategories ? "Loading subcategories..." : "Select Sub Category"}
                   </MenuItem>
-                  {productTypeOptions.map((type) => (
-                    <MenuItem key={type} value={type}>
-                      {type}
+                  {subCategories.map((sub) => (
+                    <MenuItem key={sub.sub_category_id} value={sub.sub_category_id.toString()}>
+                      {sub.name}
+                    </MenuItem>
+                  ))}
+                </StyledSelect>
+              </FormField>
+            </Grid>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <FormField>
+                <FormLabel>
+                  Brand <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
+                </FormLabel>
+                <StyledSelect
+                  value={formData.brand}
+                  onChange={handleChange("brand")}
+                  variant="outlined"
+                  fullWidth
+                  displayEmpty
+                >
+                  <MenuItem value="" disabled>
+                    {loadingBrands ? "Loading brands..." : "Select Brand"}
+                  </MenuItem>
+                  {brands.map((brand) => (
+                    <MenuItem key={brand.brand_id} value={brand.brand_id.toString()}>
+                      {brand.name}
                     </MenuItem>
                   ))}
                 </StyledSelect>
@@ -238,138 +417,114 @@ const CreateProductDrawer: React.FC<CreateProductDrawerProps> = ({
         </Box>
 
         {/* Images Section */}
-        {/* Logo Upload */}
-        <Box sx={{
-          margin: "15px 0px 0px 0px !important"
-        }}>
+        <Box sx={{ margin: "15px 0px 0px 0px !important" }}>
           <Typography variant="sb16" sx={{ marginBottom: "8px", color: "#121318" }}>
-            Logo <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
+            Product Images (Min 1, Max 5) <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
           </Typography>
+
           <Box
             sx={{
               border: "2px dashed #D1D4DE",
               borderRadius: "8px",
               padding: "40px 20px",
               display: "flex",
+              flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
               gap: "12px",
-              cursor: "pointer",
+              cursor: imagePreviews.length >= 5 ? "default" : "pointer",
               marginTop: "10px",
               backgroundColor: "#FFFFFF",
-              position: "relative",
+              opacity: imagePreviews.length >= 5 ? 0.6 : 1,
               "&:hover": {
-                backgroundColor: "#F9FAFB",
+                backgroundColor: imagePreviews.length >= 5 ? "#FFFFFF" : "#F9FAFB",
               },
             }}
-            onClick={() => document.getElementById("logo-upload")?.click()}
+            onClick={() => imagePreviews.length < 5 && document.getElementById("product-images-upload")?.click()}
           >
             <input
-              id="logo-upload"
+              id="product-images-upload"
               type="file"
               accept="image/*"
+              multiple
               style={{ display: "none" }}
               onChange={handleImageUpload}
+              disabled={imagePreviews.length >= 5}
             />
-            {imagePreviews.length > 0 ? (
-              <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "100%" }}>
-                <img
-                  src={imagePreviews[0]}
-                  alt="Logo preview"
-                  style={{
-                    maxWidth: "100%",
-                    maxHeight: "150px",
-                    borderRadius: "8px",
-                  }}
-                />
-                <Typography
-                  variant="r14"
-
-                  sx={{ marginTop: "12px", color: "#2C65F9", cursor: "pointer", }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    document.getElementById("logo-upload")?.click();
-                  }}
-                >
-                  Click to change
+            <Box
+              sx={{
+                width: "48px",
+                height: "48px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="8" y="8" width="32" height="32" rx="4" stroke="#9CA3AF" strokeWidth="2" fill="none" />
+                <circle cx="14" cy="14" r="2" fill="#9CA3AF" />
+                <path d="M8 28L16 20L24 28L32 20L40 28V36H8V28Z" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </svg>
+            </Box>
+            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+              <Typography variant="r14" sx={{ color: "#121318" }}>
+                {imagePreviews.length >= 5 ? "Maximum images reached" : "Upload Product Images"}
+              </Typography>
+              {imagePreviews.length < 5 && (
+                <Typography variant="r14" sx={{ color: "#2C65F9", textDecoration: "underline" }}>
+                  Click to browse
                 </Typography>
-              </Box>
-            ) : (
-              <>
-                {/* Picture/Image Icon */}
+              )}
+            </Box>
+          </Box>
+
+          {/* Previews Grid Below the upload field */}
+          <Grid container spacing={2} sx={{ marginTop: "16px" }}>
+            {imagePreviews.map((preview, index) => (
+              <Grid size={{ xs: "auto" }} key={index}>
                 <Box
                   sx={{
-                    width: "48px",
-                    height: "48px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
+                    position: "relative",
+                    width: "80px",
+                    height: "80px",
+                    borderRadius: "8px",
+                    overflow: "hidden",
+                    border: "1px solid #D1D4DE",
                   }}
                 >
-                  <svg
-                    width="48"
-                    height="48"
-                    viewBox="0 0 48 48"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <rect
-                      x="8"
-                      y="8"
-                      width="32"
-                      height="32"
-                      rx="4"
-                      stroke="#9CA3AF"
-                      strokeWidth="2"
-                      fill="none"
-                    />
-                    <circle
-                      cx="14"
-                      cy="14"
-                      r="2"
-                      fill="#9CA3AF"
-                    />
-                    <path
-                      d="M8 28L16 20L24 28L32 20L40 28V36H8V28Z"
-                      stroke="#9CA3AF"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      fill="none"
-                    />
-                  </svg>
-                </Box>
-
-                {/* Text Content */}
-                <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "4px" }}>
-                  <Typography
-                    variant="r14"
+                  <img
+                    src={preview}
+                    alt={`Preview ${index + 1}`}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                  />
+                  <IconButton
+                    size="small"
+                    onClick={() => handleRemoveImage(index)}
                     sx={{
-                      color: "#121318",
-                      fontSize: "14px",
-                      fontWeight: 400,
+                      position: "absolute",
+                      top: 2,
+                      right: 2,
+                      backgroundColor: "rgba(255, 255, 255, 0.8)",
+                      "&:hover": {
+                        backgroundColor: "rgba(255, 255, 255, 1)",
+                        color: "#EF4444",
+                      },
+                      padding: "2px",
+                      "& .MuiSvgIcon-root": {
+                        fontSize: "14px",
+                      },
                     }}
                   >
-                    Upload School logo
-                  </Typography>
-                  <Typography
-                    variant="r14"
-                    component="span"
-                    sx={{
-                      color: "#2C65F9",
-                      cursor: "pointer",
-                      textDecoration: "underline",
-                      fontSize: "14px",
-                      fontWeight: 400,
-                    }}
-                  >
-                    Click to browse
-                  </Typography>
+                    <Close />
+                  </IconButton>
                 </Box>
-              </>
-            )}
-          </Box>
+              </Grid>
+            ))}
+          </Grid>
         </Box>
 
         {/* Pricing & Stock Section */}
@@ -385,31 +540,53 @@ const CreateProductDrawer: React.FC<CreateProductDrawerProps> = ({
           </Typography>
           <Box>
             <Grid container spacing={3}>
-              <Grid size={{ xs: 12, md: 6 }}>
+              <Grid size={{ xs: 12, md: 5 }}>
                 <FormField>
                   <FormLabel>
-                    Price <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
+                    MRP <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
                   </FormLabel>
                   <StyledTextField
-                    placeholder="Enter price"
-                    value={formData.price}
-                    onChange={handleChange("price")}
+                    type="number"
+                    placeholder="Enter mrp"
+                    value={formData.mrp}
+                    onChange={handleChange("mrp")}
                     variant="outlined"
                     fullWidth
                   />
                 </FormField>
               </Grid>
-              <Grid size={{ xs: 12, md: 6 }}>
+              <Grid size={{ xs: 12, md: 5 }}>
                 <FormField>
                   <FormLabel>
-                    Discount Price <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
+                    Selling Price <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
                   </FormLabel>
                   <StyledTextField
-                    placeholder="Enter discounted price"
-                    value={formData.discountPrice}
-                    onChange={handleChange("discountPrice")}
+                    type="number"
+                    placeholder="Enter selling price"
+                    value={formData.sellingPrice}
+                    onChange={handleChange("sellingPrice")}
                     variant="outlined"
                     fullWidth
+                  />
+                </FormField>
+              </Grid>
+              <Grid size={{ xs: 12, md: 2 }}>
+                <FormField>
+                  <FormLabel>
+                    Discount (%) <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
+                  </FormLabel>
+                  <StyledTextField
+                    placeholder="0.00"
+                    value={formData.discountPercentage}
+                    variant="outlined"
+                    fullWidth
+                    disabled
+                    sx={{
+                      "& .MuiInputBase-input.Mui-disabled": {
+                        backgroundColor: "#F3F4F6",
+                        borderRadius: "12px",
+                      }
+                    }}
                   />
                 </FormField>
               </Grid>
@@ -430,24 +607,25 @@ const CreateProductDrawer: React.FC<CreateProductDrawerProps> = ({
               <Grid size={{ xs: 12, md: 6 }}>
                 <FormField>
                   <FormLabel>
-                    Stock Status <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
+                    Status <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
                   </FormLabel>
                   <StyledSelect
-                    value={formData.stockStatus}
-                    onChange={handleChange("stockStatus")}
+                    value={formData.status}
+                    onChange={handleChange("status")}
                     variant="outlined"
                     fullWidth
                     displayEmpty
                   >
                     <MenuItem value="" disabled>
-                      Select Visibility
+                      Select Status
                     </MenuItem>
-                    {stockStatusOptions.map((status) => (
+                    {statusOptions.map((status) => (
                       <MenuItem key={status} value={status}>
                         {status}
                       </MenuItem>
                     ))}
                   </StyledSelect>
+
                 </FormField>
               </Grid>
             </Grid>
@@ -484,11 +662,13 @@ const CreateProductDrawer: React.FC<CreateProductDrawerProps> = ({
           <Button
             variant="contained"
             onClick={handleSubmit}
+            disabled={isSubmitting}
             sx={{
               textTransform: "none",
+              minWidth: "120px",
             }}
           >
-            Add Product
+            {isSubmitting ? <CircularProgress size={24} color="inherit" /> : "Add Product"}
           </Button>
         </Stack>
       </Stack>

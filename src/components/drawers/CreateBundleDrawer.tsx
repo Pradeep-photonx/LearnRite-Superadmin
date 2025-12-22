@@ -17,10 +17,19 @@ import {
   Paper,
   styled,
   Grid,
+  Checkbox,
+  FormControlLabel,
 } from "@mui/material";
 import { Add, Remove } from "@mui/icons-material";
 import BaseDrawer from "./BaseDrawer";
 import { DeleteIcon } from "../icons/CommonIcons";
+import { getSchoolList, type School } from "../../api/school";
+import { getCategoryList, getSubCategoryList, type Category, type SubCategory } from "../../api/category";
+import { getProductList, type ProductListRow } from "../../api/product";
+import { createBundle, type CreateBundlePayload } from "../../api/bundle";
+import { getClassList, type Class } from "../../api/class";
+import { getLanguageList, type Language } from "../../api/language";
+import { notifyError, notifySuccess } from "../../utils/toastUtils";
 
 interface CreateBundleDrawerProps {
   open: boolean;
@@ -31,24 +40,26 @@ interface CreateBundleDrawerProps {
 
 export interface BundleFormData {
   bundleName: string;
-  schoolName: string;
-  grade: string;
-  secondLanguage: string;
+  school_id: string;
+  class_id: string;
+  cl_id: string;
   categories: CategoryData[];
 }
 
 export interface CategoryData {
   id: string;
   category: string;
-  bundleContents: string;
+  subCategory: string;
   products: ProductData[];
 }
 
 export interface ProductData {
   id: string;
+  product_id: number;
   productName: string;
   productImage?: string;
   quantity: number;
+  is_mandatory: number;
 }
 
 const StyledTextField = styled(TextField)({
@@ -74,27 +85,9 @@ const StyledSelect = styled(Select)({
   },
 });
 
-// Mock data for dropdowns
-const gradeOptions = ["Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6", "Grade 7", "Grade 8", "Grade 9", "Grade 10", "Grade 11", "Grade 12"];
-const languageOptions = ["Hindi", "Telugu", "Tamil", "Kannada", "Malayalam", "Marathi", "Bengali", "Gujarati"];
-const categoryOptions = ["Notebooks", "Pens", "Pencils", "Books", "Art Supplies", "Lab Equipment"];
-const bundleContentsOptions = ["Standard Bundle", "Premium Bundle", "Custom Bundle"];
+// Dropdown options
 
-// Mock product data
-const mockProducts: ProductData[] = [
-  {
-    id: "1",
-    productName: "Classmate Single Line Long Notebook",
-    productImage: "https://via.placeholder.com/40x40/2C65F9/FFFFFF?text=N",
-    quantity: 1,
-  },
-  {
-    id: "2",
-    productName: "Classmate Single Line Long Notebook",
-    productImage: "https://via.placeholder.com/40x40/2C65F9/FFFFFF?text=N",
-    quantity: 1,
-  },
-];
+// No mock products needed anymore
 
 const FormField = styled(Box)({
   display: "flex",
@@ -112,22 +105,78 @@ const CreateBundleDrawer: React.FC<CreateBundleDrawerProps> = ({
   open,
   onClose,
   onSubmit,
-  schoolName = "",
 }) => {
   const [formData, setFormData] = useState<BundleFormData>({
     bundleName: "",
-    schoolName: schoolName,
-    grade: "",
-    secondLanguage: "",
+    school_id: "",
+    class_id: "",
+    cl_id: "",
     categories: [
       {
         id: "1",
         category: "",
-        bundleContents: "",
+        subCategory: "",
         products: [],
       },
     ],
   });
+
+  const [schools, setSchools] = useState<School[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [classes, setClasses] = useState<Class[]>([]);
+  const [languages, setLanguages] = useState<Language[]>([]);
+  const [subCategoriesMap, setSubCategoriesMap] = useState<Record<string, SubCategory[]>>({});
+  const [productsMap, setProductsMap] = useState<Record<string, ProductListRow[]>>({});
+  const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const fetchInitialData = async () => {
+    try {
+      setLoading(true);
+      const [schoolsData, categoriesData, classesData, languagesData] = await Promise.all([
+        getSchoolList(),
+        getCategoryList(),
+        getClassList(),
+        getLanguageList(),
+      ]);
+      setSchools(schoolsData.rows);
+      setCategories(categoriesData.rows);
+      setClasses(classesData.rows);
+      setLanguages(languagesData.rows);
+    } catch (error) {
+      notifyError(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (open) {
+      fetchInitialData();
+    }
+  }, [open]);
+
+  const fetchSubCategories = async (categoryId: string) => {
+    if (!categoryId || subCategoriesMap[categoryId]) return;
+    try {
+      const data = await getSubCategoryList(Number(categoryId));
+      setSubCategoriesMap(prev => ({ ...prev, [categoryId]: data.rows }));
+    } catch (error) {
+      notifyError(error);
+    }
+  };
+
+  const fetchProducts = async (categoryId: string, subCategoryId: string) => {
+    const key = `${categoryId}-${subCategoryId}`;
+    if (!subCategoryId || productsMap[key]) return;
+    try {
+      const data = await getProductList(); // This API seems to return all products, you might need to filter or use a specific API if available
+      // For now, let's filter if needed or just store all and filter in UI
+      setProductsMap(prev => ({ ...prev, [key]: data.rows }));
+    } catch (error) {
+      notifyError(error);
+    }
+  };
 
   const handleChange = (field: keyof BundleFormData) => (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { value: unknown } }
@@ -142,13 +191,22 @@ const CreateBundleDrawer: React.FC<CreateBundleDrawerProps> = ({
   const handleCategoryChange = (categoryId: string, field: keyof CategoryData) => (
     event: { target: { value: unknown } }
   ) => {
-    const value = event.target.value;
+    const value = event.target.value as string;
     setFormData((prev) => ({
       ...prev,
       categories: prev.categories.map((cat) =>
-        cat.id === categoryId ? { ...cat, [field]: value } : cat
+        cat.id === categoryId ? { ...cat, [field]: value, ...(field === "category" ? { subCategory: "", products: [] } : { products: [] }) } : cat
       ),
     }));
+
+    if (field === "category") {
+      fetchSubCategories(value);
+    } else if (field === "subCategory") {
+      const cat = formData.categories.find(c => c.id === categoryId);
+      if (cat) {
+        fetchProducts(cat.category, value);
+      }
+    }
   };
 
   const handleAddCategory = () => {
@@ -159,7 +217,7 @@ const CreateBundleDrawer: React.FC<CreateBundleDrawerProps> = ({
         {
           id: Date.now().toString(),
           category: "",
-          bundleContents: "",
+          subCategory: "",
           products: [],
         },
       ],
@@ -173,13 +231,35 @@ const CreateBundleDrawer: React.FC<CreateBundleDrawerProps> = ({
     }));
   };
 
-  const handleAddProducts = (categoryId: string) => {
-    // When bundle contents is selected, add mock products
+  const handleAddProduct = (categoryId: string, productId: string) => {
+    const category = formData.categories.find(c => c.id === categoryId);
+    if (!category) return;
+
+    const key = `${category.category}-${category.subCategory}`;
+    const productRow = productsMap[key]?.find(row => row.Category.SubCategory.Product.product_id === Number(productId));
+    if (!productRow) return;
+
+    const product = productRow.Category.SubCategory.Product;
+
+    if (category.products.find(p => p.product_id === product.product_id)) {
+      notifyError("Product already added to this category section");
+      return;
+    }
+
+    const newProduct: ProductData = {
+      id: Date.now().toString(),
+      product_id: product.product_id,
+      productName: product.name,
+      productImage: product.images?.[0] || "",
+      quantity: 1,
+      is_mandatory: 1,
+    };
+
     setFormData((prev) => ({
       ...prev,
       categories: prev.categories.map((cat) =>
         cat.id === categoryId
-          ? { ...cat, products: [...mockProducts] }
+          ? { ...cat, products: [...cat.products, newProduct] }
           : cat
       ),
     }));
@@ -214,11 +294,62 @@ const CreateBundleDrawer: React.FC<CreateBundleDrawerProps> = ({
     }));
   };
 
-  const handleSubmit = () => {
-    if (onSubmit) {
-      onSubmit(formData);
+  const handleMandatoryChange = (categoryId: string, productId: string, isMandatory: boolean) => {
+    setFormData((prev) => ({
+      ...prev,
+      categories: prev.categories.map((cat) =>
+        cat.id === categoryId
+          ? {
+            ...cat,
+            products: cat.products.map((p) =>
+              p.id === productId ? { ...p, is_mandatory: isMandatory ? 1 : 0 } : p
+            ),
+          }
+          : cat
+      ),
+    }));
+  };
+
+  const handleSubmit = async () => {
+    if (!formData.bundleName || !formData.school_id || !formData.class_id || !formData.cl_id) {
+      notifyError("Please fill in all required bundle details");
+      return;
     }
-    onClose();
+
+    const allProducts = formData.categories.flatMap(cat =>
+      cat.products.map(p => ({
+        product_id: p.product_id,
+        quantity: p.quantity,
+        is_mandatory: p.is_mandatory
+      }))
+    );
+
+    if (allProducts.length === 0) {
+      notifyError("Please add at least one product to the bundle");
+      return;
+    }
+
+    const payload: CreateBundlePayload = {
+      class_id: Number(formData.class_id),
+      cl_id: Number(formData.cl_id),
+      school_id: Number(formData.school_id),
+      name: formData.bundleName,
+      products: allProducts,
+    };
+
+    try {
+      setIsSubmitting(true);
+      await createBundle(payload);
+      notifySuccess("Bundle created successfully");
+      if (onSubmit) {
+        onSubmit(formData);
+      }
+      onClose();
+    } catch (error) {
+      notifyError(error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
 
@@ -249,8 +380,8 @@ const CreateBundleDrawer: React.FC<CreateBundleDrawerProps> = ({
                   School Name <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
                 </FormLabel>
                 <StyledSelect
-                  value={formData.schoolName}
-                  onChange={handleChange("schoolName")}
+                  value={formData.school_id}
+                  onChange={handleChange("school_id")}
                   variant="outlined"
                   fullWidth
                   displayEmpty
@@ -258,28 +389,9 @@ const CreateBundleDrawer: React.FC<CreateBundleDrawerProps> = ({
                   <MenuItem value="" disabled>
                     Select school
                   </MenuItem>
-                  <MenuItem value={schoolName}>{schoolName}</MenuItem>
-                </StyledSelect>
-              </FormField>
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <FormField>
-                <FormLabel>
-                  Grade <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
-                </FormLabel>
-                <StyledSelect
-                  value={formData.grade}
-                  onChange={handleChange("grade")}
-                  variant="outlined"
-                  fullWidth
-                  displayEmpty
-                >
-                  <MenuItem value="" disabled>
-                    Select Grade
-                  </MenuItem>
-                  {gradeOptions.map((grade) => (
-                    <MenuItem key={grade} value={grade}>
-                      {grade}
+                  {schools.map((school) => (
+                    <MenuItem key={school.school_id} value={school.school_id.toString()}>
+                      {school.name}
                     </MenuItem>
                   ))}
                 </StyledSelect>
@@ -288,11 +400,34 @@ const CreateBundleDrawer: React.FC<CreateBundleDrawerProps> = ({
             <Grid size={{ xs: 12, md: 6 }}>
               <FormField>
                 <FormLabel>
-                  Second Language <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
+                  Class<Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
                 </FormLabel>
                 <StyledSelect
-                  value={formData.secondLanguage}
-                  onChange={handleChange("secondLanguage")}
+                  value={formData.class_id}
+                  onChange={handleChange("class_id")}
+                  variant="outlined"
+                  fullWidth
+                  displayEmpty
+                >
+                  <MenuItem value="" disabled>
+                    Select Class
+                  </MenuItem>
+                  {classes.map((cls) => (
+                    <MenuItem key={cls.class_id} value={cls.class_id.toString()}>
+                      {cls.name}
+                    </MenuItem>
+                  ))}
+                </StyledSelect>
+              </FormField>
+            </Grid>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <FormField>
+                <FormLabel>
+                  Languages <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
+                </FormLabel>
+                <StyledSelect
+                  value={formData.cl_id}
+                  onChange={handleChange("cl_id")}
                   variant="outlined"
                   fullWidth
                   displayEmpty
@@ -300,9 +435,9 @@ const CreateBundleDrawer: React.FC<CreateBundleDrawerProps> = ({
                   <MenuItem value="" disabled>
                     Select language
                   </MenuItem>
-                  {languageOptions.map((lang) => (
-                    <MenuItem key={lang} value={lang}>
-                      {lang}
+                  {languages.map((lang) => (
+                    <MenuItem key={lang.cl_id} value={lang.cl_id.toString()}>
+                      {lang.language}
                     </MenuItem>
                   ))}
                 </StyledSelect>
@@ -359,11 +494,11 @@ const CreateBundleDrawer: React.FC<CreateBundleDrawerProps> = ({
                       displayEmpty
                     >
                       <MenuItem value="" disabled>
-                        Select category
+                        {loading ? "Loading categories..." : "Select category"}
                       </MenuItem>
-                      {categoryOptions.map((cat) => (
-                        <MenuItem key={cat} value={cat}>
-                          {cat}
+                      {categories.map((cat) => (
+                        <MenuItem key={cat.category_id} value={cat.category_id.toString()}>
+                          {cat.name}
                         </MenuItem>
                       ))}
                     </StyledSelect>
@@ -375,51 +510,55 @@ const CreateBundleDrawer: React.FC<CreateBundleDrawerProps> = ({
                       Sub Category <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
                     </FormLabel>
                     <StyledSelect
-                      value={category.category}
-                      onChange={handleCategoryChange(category.id, "category")}
+                      value={category.subCategory}
+                      onChange={handleCategoryChange(category.id, "subCategory")}
                       variant="outlined"
                       fullWidth
                       displayEmpty
+                      disabled={!category.category}
                     >
                       <MenuItem value="" disabled>
-                        Select category
+                        {!category.category ? "Select Category first" : "Select sub category"}
                       </MenuItem>
-                      {categoryOptions.map((cat) => (
-                        <MenuItem key={cat} value={cat}>
-                          {cat}
+                      {(subCategoriesMap[category.category] || []).map((sub) => (
+                        <MenuItem key={sub.sub_category_id} value={sub.sub_category_id.toString()}>
+                          {sub.name}
                         </MenuItem>
                       ))}
                     </StyledSelect>
                   </FormField>
                 </Grid>
-                <Grid size={{ xs: 12 }}>
+                <Grid size={{ xs: 6 }}>
                   <FormField>
                     <FormLabel>
-                      Bundle contents <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
+                      Products <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
                     </FormLabel>
                     <StyledSelect
-                      value={category.bundleContents}
+                      value=""
                       onChange={(e) => {
-                        handleCategoryChange(category.id, "bundleContents")(e);
                         if (e.target.value) {
-                          handleAddProducts(category.id);
+                          handleAddProduct(category.id, e.target.value as string);
                         }
                       }}
                       variant="outlined"
                       fullWidth
                       displayEmpty
+                      disabled={!category.subCategory}
                     >
                       <MenuItem value="" disabled>
-                        Select products
+                        {!category.subCategory ? "Select Sub Category first" : "Add products"}
                       </MenuItem>
-                      {bundleContentsOptions.map((content) => (
-                        <MenuItem key={content} value={content}>
-                          {content}
-                        </MenuItem>
-                      ))}
+                      {(productsMap[`${category.category}-${category.subCategory}`] || [])
+                        .filter(row => row.Category.SubCategory.sub_category_id === Number(category.subCategory))
+                        .map((row) => (
+                          <MenuItem key={row.Category.SubCategory.Product.product_id} value={row.Category.SubCategory.Product.product_id.toString()}>
+                            {row.Category.SubCategory.Product.name}
+                          </MenuItem>
+                        ))}
                     </StyledSelect>
                   </FormField>
                 </Grid>
+
               </Grid>
               <TableContainer
                 component={Paper}
@@ -556,7 +695,7 @@ const CreateBundleDrawer: React.FC<CreateBundleDrawerProps> = ({
                                   borderRadius: "8px",
                                   height: "32px",
                                   boxShadow: "none !important",
-                                  border: "1px solid#1213181A",
+                                  border: "1px solid #1213181A",
                                 },
                               }}
                             />
@@ -575,6 +714,19 @@ const CreateBundleDrawer: React.FC<CreateBundleDrawerProps> = ({
                             padding: "12px 16px",
                           }}
                         >
+                          <FormControlLabel control={<Checkbox
+                            checked={product.is_mandatory === 1}
+                            onChange={(e) => handleMandatoryChange(category.id, product.id, e.target.checked)}
+                            sx={{
+                              color: "#D96200",
+                              borderRadius: "4px",
+                              padding: "0px 10px 0px 0px",
+                              '&.Mui-checked': {
+                                color: "#D96200",
+                                borderRadius: "4px",
+                              },
+                            }}
+                          />} label="Mandatory" />
                           <IconButton
                             onClick={() => handleDeleteProduct(category.id, product.id)}
                           >
@@ -630,15 +782,17 @@ const CreateBundleDrawer: React.FC<CreateBundleDrawerProps> = ({
           <Button
             variant="contained"
             onClick={handleSubmit}
+            disabled={isSubmitting}
             sx={{
               textTransform: "none",
+              minWidth: "120px",
             }}
           >
-            Create Bundle
+            {isSubmitting ? "Creating..." : "Create Bundle"}
           </Button>
         </Stack>
       </Stack>
-    </BaseDrawer>
+    </BaseDrawer >
   );
 };
 
