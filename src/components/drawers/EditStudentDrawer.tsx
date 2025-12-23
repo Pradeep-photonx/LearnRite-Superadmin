@@ -13,13 +13,14 @@ import {
 } from "@mui/material";
 import BaseDrawer from "./BaseDrawer";
 import { getClassList, type Class } from "../../api/class";
-import { createAdmission, type AdmissionPayload } from "../../api/admission";
+import { updateAdmission, type Admission, type UpdateAdmissionPayload } from "../../api/admission";
 import { notifyError, notifySuccess } from "../../utils/toastUtils";
 
-interface AddStudentDrawerProps {
+interface EditStudentDrawerProps {
     open: boolean;
     onClose: () => void;
-    onSubmit?: (data: StudentFormData) => void;
+    admission: Admission | null;
+    onUpdate?: () => void;
 }
 
 export interface StudentFormData {
@@ -57,7 +58,7 @@ const StyledTextField = styled(TextField)({
     },
 });
 
-const AddStudentDrawer: React.FC<AddStudentDrawerProps> = ({ open, onClose, onSubmit }) => {
+const EditStudentDrawer: React.FC<EditStudentDrawerProps> = ({ open, onClose, admission, onUpdate }) => {
     const [formData, setFormData] = useState<StudentFormData>({
         name: "",
         class_id: "",
@@ -83,17 +84,19 @@ const AddStudentDrawer: React.FC<AddStudentDrawerProps> = ({ open, onClose, onSu
 
         if (open) {
             fetchClasses();
-            setFormData({
-                name: "",
-                class_id: "",
-                admission_number: "",
-                parent_name: "",
-                parent_mobile: "",
-                status: "Active",
-            });
+            if (admission) {
+                setFormData({
+                    name: admission.student_name,
+                    class_id: admission.class_id.toString(),
+                    admission_number: admission.admission_id,
+                    parent_name: admission.parent_name,
+                    parent_mobile: admission.parent_mobile_number,
+                    status: admission.is_active ? "Active" : "Inactive",
+                });
+            }
             setErrors({});
         }
-    }, [open]);
+    }, [open, admission]);
 
     const handleChange = (field: keyof StudentFormData) => (
         event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { value: unknown } }
@@ -129,24 +132,22 @@ const AddStudentDrawer: React.FC<AddStudentDrawerProps> = ({ open, onClose, onSu
     };
 
     const handleSubmit = async () => {
-        if (validateForm()) {
+        if (validateForm() && admission) {
             setLoading(true);
             try {
-                // API call
-                const payload: AdmissionPayload = {
-                    admission_id: formData.admission_number,
+                const payload: UpdateAdmissionPayload = {
                     student_name: formData.name,
                     class_id: Number(formData.class_id),
                     parent_name: formData.parent_name,
                     parent_mobile_number: formData.parent_mobile,
-                    new_admission: false, // Assuming new admission by default
+                    new_admission: admission.new_admission,
                     is_active: formData.status === "Active",
                 };
 
-                await createAdmission(payload);
+                await updateAdmission(admission.admission_id, payload);
 
-                notifySuccess("Student added successfully");
-                onSubmit?.(formData);
+                notifySuccess("Student updated successfully");
+                onUpdate?.();
                 onClose();
             } catch (error) {
                 notifyError(error);
@@ -157,7 +158,7 @@ const AddStudentDrawer: React.FC<AddStudentDrawerProps> = ({ open, onClose, onSu
     };
 
     return (
-        <BaseDrawer open={open} onClose={onClose} title="Add Student" width={500}>
+        <BaseDrawer open={open} onClose={onClose} title="Edit Student" width={500}>
             <Stack spacing={4}>
                 <Grid container spacing={3}>
                     <Grid size={{ xs: 12 }} sx={{ width: '100%' }}>
@@ -208,16 +209,18 @@ const AddStudentDrawer: React.FC<AddStudentDrawerProps> = ({ open, onClose, onSu
                     <Grid size={{ xs: 12 }} sx={{ width: '100%' }}>
                         <FormField>
                             <FormLabel>
-                                Admission Number <Typography component="span" sx={{ color: "#EF4444" }}>*</Typography>
+                                Admission Number <Typography component="span" sx={{ color: "#787E91", fontSize: "12px" }}>(Cannot be changed)</Typography>
                             </FormLabel>
                             <StyledTextField
-                                placeholder="Enter admission number"
                                 value={formData.admission_number}
-                                onChange={handleChange("admission_number")}
                                 variant="outlined"
                                 fullWidth
-                                error={!!errors.admission_number}
-                                helperText={errors.admission_number}
+                                disabled
+                                sx={{
+                                    "& .MuiOutlinedInput-root": {
+                                        backgroundColor: "#F3F4F6",
+                                    }
+                                }}
                             />
                         </FormField>
                     </Grid>
@@ -304,7 +307,7 @@ const AddStudentDrawer: React.FC<AddStudentDrawerProps> = ({ open, onClose, onSu
                             minWidth: "140px",
                         }}
                     >
-                        {loading ? <CircularProgress size={24} color="inherit" /> : "Add Student"}
+                        {loading ? <CircularProgress size={24} color="inherit" /> : "Update Student"}
                     </Button>
                 </Stack>
             </Stack>
@@ -312,4 +315,4 @@ const AddStudentDrawer: React.FC<AddStudentDrawerProps> = ({ open, onClose, onSu
     );
 };
 
-export default AddStudentDrawer;
+export default EditStudentDrawer;
