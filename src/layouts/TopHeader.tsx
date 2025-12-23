@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   Box,
-  Button,
+  // Button,
   IconButton,
   InputBase,
   Menu,
@@ -12,12 +12,12 @@ import {
   Avatar,
   Badge,
 } from "@mui/material";
-import {
-  KeyboardArrowDown,
-  SearchRounded,
-  ArrowBack,
-  Notifications,
-} from "@mui/icons-material";
+// import {
+//   KeyboardArrowDown,
+//   SearchRounded,
+//   ArrowBack,
+//   Notifications,
+// } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { ArrowDownIcon, NotificationIcon, SearchIcon } from "../components/icons/CommonIcons";
 
@@ -35,9 +35,9 @@ const TopHeader: React.FC = () => {
   const [selectedDateFilter, setSelectedDateFilter] = useState("Last 30 days");
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
 
-  const handleDateFilterOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setDateFilterAnchor(event.currentTarget);
-  };
+  // const handleDateFilterOpen = (event: React.MouseEvent<HTMLElement>) => {
+  //   setDateFilterAnchor(event.currentTarget);
+  // };
 
   const handleDateFilterClose = () => {
     setDateFilterAnchor(null);
@@ -161,7 +161,7 @@ const TopHeader: React.FC = () => {
                 fontWeight: 600,
               }}
             >
-              LR
+              {(localStorage.getItem("name") || "L")[0].toUpperCase()}
             </Avatar>
             <Box sx={{
               display: "flex",
@@ -171,14 +171,8 @@ const TopHeader: React.FC = () => {
             }}>
               <Typography
                 variant="m16"
-              // sx={{
-              //   color: "#121318",
-              //   fontSize: "14px",
-              //   fontWeight: 600,
-              //   lineHeight: "20px",
-              // }}
               >
-                Learnrite
+                {localStorage.getItem("name") || "Learnrite"}
               </Typography>
               <Typography
                 variant="m12"
@@ -186,7 +180,7 @@ const TopHeader: React.FC = () => {
                   color: "#787E91",
                 }}
               >
-                Super Admin
+                {localStorage.getItem("role") === "super_admin" ? "Super Admin" : "School Admin"}
               </Typography>
             </Box>
             <ArrowDownIcon />

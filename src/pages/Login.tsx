@@ -48,11 +48,15 @@ const Login: React.FC = () => {
             const response = await login(formData);
             console.log("Login Response:", response);
 
-            // Store token
+            // Store token, role, and name
             if (response.token) {
                 localStorage.setItem("token", response.token);
+                localStorage.setItem("role", response.role);
+                localStorage.setItem("name", response.admin?.name || "User");
             } else if (response.data?.token) {
                 localStorage.setItem("token", response.data.token);
+                localStorage.setItem("role", response.data.role);
+                localStorage.setItem("name", response.data.admin?.name || "User");
             }
 
             navigate("/overview");

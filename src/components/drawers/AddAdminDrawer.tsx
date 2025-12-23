@@ -12,7 +12,7 @@ import {
     CircularProgress,
 } from "@mui/material";
 import BaseDrawer from "./BaseDrawer";
-import { updateSchoolAdmin, type SchoolAdmin, type AdminUpdatePayload } from "../../api/school";
+import { updateSchoolAdmin, createSchoolAdmin, type SchoolAdmin, type AdminUpdatePayload, type CreateAdminPayload } from "../../api/school";
 import { notifyError, notifySuccess } from "../../utils/toastUtils";
 
 interface AddAdminDrawerProps {
@@ -143,11 +143,16 @@ const AddAdminDrawer: React.FC<AddAdminDrawerProps> = ({
                     await updateSchoolAdmin(admin.school_admin_id, payload);
                     notifySuccess("Admin updated successfully");
                 } else {
-                    // Create mode - if there's no separate create admin API, we might need to use registerSchool with placeholder data or wait for instructions
-                    // For now, assuming update is the priority as per curl provided
-                    notifyError("Create admin functionality not yet implemented in API");
-                    setLoading(false);
-                    return;
+                    // Create mode
+                    const payload: CreateAdminPayload = {
+                        school_id: Number(schoolId),
+                        fullname: formData.name,
+                        email: formData.email,
+                        mobile_number: formData.mobile_number,
+                        status: formData.status,
+                    };
+                    await createSchoolAdmin(payload);
+                    notifySuccess("Admin created successfully");
                 }
 
                 onSubmit?.();

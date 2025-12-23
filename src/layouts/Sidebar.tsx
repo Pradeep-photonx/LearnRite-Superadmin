@@ -42,6 +42,18 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const userRole = localStorage.getItem("role");
+
+  const filteredNavItems = navItems.filter((item) => {
+    if (userRole === "super_admin") {
+      return item.path !== "/students";
+    }
+    if (userRole === "school_admin") {
+      const hiddenPaths = ["/schools", "/school-bundles", "/products", "/customers"];
+      return !hiddenPaths.includes(item.path);
+    }
+    return true;
+  });
 
   const sidebarWidth = isCollapsed ? "90px" : "280px";
 
@@ -120,7 +132,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
           },
         }}
       >
-        {navItems.map((item) => {
+        {filteredNavItems.map((item) => {
           const isActive = location.pathname === item.path;
           const iconColor = isActive ? "#FFFFFF" : "#121318";
 

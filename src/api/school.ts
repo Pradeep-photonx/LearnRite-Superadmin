@@ -66,6 +66,14 @@ export interface AdminUpdatePayload {
     mobile_number: string;
 }
 
+export interface CreateAdminPayload {
+    school_id: number;
+    fullname: string;
+    email: string;
+    mobile_number: string;
+    status: string;
+}
+
 export interface SchoolListResponse {
     count: number;
     rows: School[];
@@ -98,5 +106,10 @@ export const getSchoolAdminList = async (schoolId: number) => {
 
 export const updateSchoolAdmin = async (adminId: number, data: AdminUpdatePayload) => {
     const response = await axiosClient.patch(`/SchoolAdmin/update/${adminId}`, data);
+    return response.data;
+};
+
+export const createSchoolAdmin = async (data: CreateAdminPayload) => {
+    const response = await axiosClient.post("/SchoolAdmin/create", data);
     return response.data;
 };
