@@ -26,6 +26,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: "Overview", path: "/overview", icon: <OverviewIcon /> },
+  { label: "Students", path: "/students", icon: <CustomersIcon /> },
   { label: "School", path: "/schools", icon: <SchoolIconn /> },
   { label: "School Bundles", path: "/school-bundles", icon: <SchoolBundlesIcon /> },
   { label: "Products", path: "/products", icon: <ProductsIcon /> },
@@ -122,7 +123,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
           const iconColor = isActive ? "#FFFFFF" : "#121318";
-          
+
           // Clone the icon with the appropriate color
           const iconWithColor = React.cloneElement(item.icon as React.ReactElement, {
             style: { stroke: iconColor, color: iconColor },
@@ -198,7 +199,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
           transition: "all 0.3s ease-in-out",
           position: "absolute",
           top: 0,
-          right:"-30px",
+          right: "-30px",
         }}
       >
         <IconButton

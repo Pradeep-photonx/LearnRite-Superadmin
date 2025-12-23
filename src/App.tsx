@@ -14,6 +14,7 @@ import Login from "./pages/Login";
 import Layout from "./layouts/Layout";
 
 import { Toaster } from 'react-hot-toast';
+import Students from "./pages/Students";
 
 function App() {
   return (
@@ -42,6 +43,7 @@ function App() {
                     <Route path="/products/categories/:categorySlug" element={<Products />} />
                     <Route path="/customers" element={<Customers />} />
                     <Route path="/orders" element={<Orders />} />
+                    <Route path="/students" element={<Students />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </Layout>

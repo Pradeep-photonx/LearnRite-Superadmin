@@ -193,7 +193,6 @@ const AddAdminDrawer: React.FC<AddAdminDrawerProps> = ({
                                 fullWidth
                                 error={!!errors.email}
                                 helperText={errors.email}
-                                disabled={!!admin} // Usually email is not editable
                             />
                         </FormField>
                     </Grid>

@@ -30,7 +30,10 @@ import { format } from "date-fns";
 
 const Schools: React.FC = () => {
   const [filterAnchor, setFilterAnchor] = useState<null | HTMLElement>(null);
-  const [selectedFilter, setSelectedFilter] = useState("All Schools");
+  const [selectedFilter, setSelectedFilter] = useState<{ id: string | number; name: string }>({
+    id: "all",
+    name: "All Schools",
+  });
   const [actionMenuAnchor, setActionMenuAnchor] = useState<null | HTMLElement>(null);
   const [isAddSchoolDrawerOpen, setIsAddSchoolDrawerOpen] = useState(false);
   const [isEditSchoolDrawerOpen, setIsEditSchoolDrawerOpen] = useState(false);
@@ -69,10 +72,16 @@ const Schools: React.FC = () => {
     setFilterAnchor(null);
   };
 
-  const handleFilterSelect = (filter: string) => {
-    setSelectedFilter(filter);
+  const handleFilterSelect = (id: string | number, name: string) => {
+    setSelectedFilter({ id, name });
     setFilterAnchor(null);
   };
+
+  const displaySchools = React.useMemo(() => {
+    return selectedFilter.id === "all"
+      ? schools
+      : schools.filter((school) => school.school_id === Number(selectedFilter.id));
+  }, [schools, selectedFilter]);
 
   const handleActionMenuOpen = (event: React.MouseEvent<HTMLElement>, school: School) => {
     event.stopPropagation(); // Stop row click
@@ -193,7 +202,7 @@ const Schools: React.FC = () => {
               },
             }}
           >
-            {selectedFilter}
+            {selectedFilter.name}
           </Button>
 
           {/* Add School Button */}
@@ -220,23 +229,20 @@ const Schools: React.FC = () => {
             }}
           >
             <MenuItem
-              onClick={() => handleFilterSelect("All Schools")}
-              selected={selectedFilter === "All Schools"}
+              onClick={() => handleFilterSelect("all", "All Schools")}
+              selected={selectedFilter.id === "all"}
             >
               <Typography variant="r14">All Schools</Typography>
             </MenuItem>
-            <MenuItem
-              onClick={() => handleFilterSelect("Active Schools")}
-              selected={selectedFilter === "Active Schools"}
-            >
-              <Typography variant="r14">Delhi Public Schools</Typography>
-            </MenuItem>
-            <MenuItem
-              onClick={() => handleFilterSelect("Inactive Schools")}
-              selected={selectedFilter === "Inactive Schools"}
-            >
-              <Typography variant="r14">Mumbai Public Schools</Typography>
-            </MenuItem>
+            {schools.map((school) => (
+              <MenuItem
+                key={school.school_id}
+                onClick={() => handleFilterSelect(school.school_id, school.name)}
+                selected={selectedFilter.id === school.school_id}
+              >
+                <Typography variant="r14">{school.name}</Typography>
+              </MenuItem>
+            ))}
           </Menu>
         </Stack>
       </Stack>
@@ -275,7 +281,7 @@ const Schools: React.FC = () => {
                 </TableCell>
               </TableRow>
             ) : (
-              schools.map((school: School) => (
+              displaySchools.map((school: School) => (
                 <TableRow
                   key={school.school_id}
                   onClick={() => handleSchoolClick(school)}

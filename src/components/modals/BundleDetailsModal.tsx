@@ -49,6 +49,7 @@ const BundleDetailsModal: React.FC<BundleDetailsModalProps> = ({
   const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({});
   const [sections, setSections] = useState<CategorySection[]>([]);
   const [loading, setLoading] = useState(false);
+  const [fetchedPrice, setFetchedPrice] = useState<number | null>(null);
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => ({
@@ -63,19 +64,29 @@ const BundleDetailsModal: React.FC<BundleDetailsModalProps> = ({
 
       setLoading(true);
       try {
-        const detail = await getBundleDetail(bundle.bundle_id);
+        const detail: any = await getBundleDetail(bundle.bundle_id);
+        console.log("Bundle Detail API Response:", detail);
+
+        const bundleData = detail.row || detail;
+        const products = bundleData.products || bundleData.allProducts || [];
+
+        // Update local state with fetched price if available
+        if (bundleData.total_bundle_cost) {
+          // This ensures the summary card shows the correct price from the view API
+          setFetchedPrice(bundleData.total_bundle_cost);
+        }
 
         const commonBooks: ItemData[] = [];
         const stationary: ItemData[] = [];
 
-        detail.allProducts.forEach((bp: any) => {
+        products.forEach((bp: any) => {
           const item: ItemData = {
-            id: bp.product_id.toString(),
-            name: bp.Product.name,
+            id: bp.product_id?.toString() || bp.Product?.product_id?.toString(),
+            name: bp.product_name || bp.Product?.name || "N/A",
             quantity: bp.quantity,
             price: bp.price,
-            image: bp.Product.images?.[0],
-            is_mandatory: bp.is_mandatory === 1
+            image: bp.Product?.images?.[0],
+            is_mandatory: bp.is_mandatory === 1 || bp.is_mandatory === true
           };
 
           if (item.is_mandatory) {
@@ -87,7 +98,7 @@ const BundleDetailsModal: React.FC<BundleDetailsModalProps> = ({
 
         const sectionList: CategorySection[] = [];
         if (commonBooks.length > 0) {
-          sectionList.push({ name: "Common books", items: commonBooks });
+          sectionList.push({ name: "Common Books", items: commonBooks });
         }
         if (stationary.length > 0) {
           sectionList.push({ name: "Stationary", items: stationary });
@@ -180,7 +191,7 @@ const BundleDetailsModal: React.FC<BundleDetailsModalProps> = ({
                 </Stack>
                 <Stack spacing={0.5} alignItems="flex-end">
                   <Typography variant="sb24" sx={{ color: "#155DFC" }}>
-                    ₹ {bundle.total_bundle_price}/-
+                    ₹ {fetchedPrice ?? bundle.total_bundle_price}/-
                   </Typography>
                   <Typography variant="r14" sx={{ color: "text.secondary" }}>
                     inc of all taxes

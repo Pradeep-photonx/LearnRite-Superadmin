@@ -63,7 +63,7 @@ const SchoolDetailView: React.FC<SchoolDetailViewProps> = ({ school, onBack }) =
             ]);
             setDetailedSchool(detailRes.row);
             // Filter bundles for this school
-            setSchoolBundles(bundlesRes.rows.filter(b => b.school_id === school.school_id));
+            setSchoolBundles(bundlesRes.rows.filter(b => Number(b.school_id) === Number(school.school_id)));
         } catch (error) {
             console.error("Failed to fetch school details:", error);
         } finally {
@@ -271,7 +271,7 @@ const SchoolDetailView: React.FC<SchoolDetailViewProps> = ({ school, onBack }) =
                                         },
                                         "& .MuiChip-label": {
                                             padding: "0 4px",
-                                            fontSize: "15px !important",
+                                            fontSize: "12px !important",
                                         }
                                     }}
                                 />
@@ -430,7 +430,7 @@ const SchoolDetailView: React.FC<SchoolDetailViewProps> = ({ school, onBack }) =
                                                         },
                                                     }}
                                                 >
-                                                    <Typography>
+                                                    <Typography sx={{ fontWeight: 500 }}>
                                                         {bundle.name}
                                                     </Typography>
                                                     <Typography variant="m12" color="#787E91">
@@ -613,6 +613,7 @@ const SchoolDetailView: React.FC<SchoolDetailViewProps> = ({ school, onBack }) =
                 onClose={handleCloseCreateBundleDrawer}
                 onSubmit={handleSubmitBundle}
                 schoolName={currentSchool.name}
+                schoolId={school.school_id}
             />
 
             {/* Bundle Details Drawer */}

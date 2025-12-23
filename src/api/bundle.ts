@@ -50,6 +50,7 @@ export interface BundleDetailResponse {
     total_bundle_price: number;
     allProducts: (BundleProduct & {
         price: number;
+        product_name?: string;
         Product: {
             name: string;
             images: string[];

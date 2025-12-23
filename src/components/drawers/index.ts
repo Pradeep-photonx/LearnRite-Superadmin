@@ -11,3 +11,5 @@ export { default as CreateCategoryDrawer } from "./CreateCategoryDrawer";
 export type { CategoryFormData } from "./CreateCategoryDrawer";
 
 
+export { default as AddStudentDrawer } from "./AddStudentDrawer";
+export type { StudentFormData } from "./AddStudentDrawer";

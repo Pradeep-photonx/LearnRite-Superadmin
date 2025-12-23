@@ -36,6 +36,7 @@ interface CreateBundleDrawerProps {
   onClose: () => void;
   onSubmit?: (data: BundleFormData) => void;
   schoolName?: string;
+  schoolId?: number;
 }
 
 export interface BundleFormData {
@@ -105,6 +106,8 @@ const CreateBundleDrawer: React.FC<CreateBundleDrawerProps> = ({
   open,
   onClose,
   onSubmit,
+  schoolName,
+  schoolId
 }) => {
   const [formData, setFormData] = useState<BundleFormData>({
     bundleName: "",
@@ -155,6 +158,15 @@ const CreateBundleDrawer: React.FC<CreateBundleDrawerProps> = ({
       fetchInitialData();
     }
   }, [open]);
+
+  React.useEffect(() => {
+    if (open && schoolId) {
+      setFormData(prev => ({
+        ...prev,
+        school_id: schoolId.toString()
+      }));
+    }
+  }, [open, schoolId]);
 
   const fetchSubCategories = async (categoryId: string) => {
     if (!categoryId || subCategoriesMap[categoryId]) return;
@@ -359,7 +371,12 @@ const CreateBundleDrawer: React.FC<CreateBundleDrawerProps> = ({
 
 
   return (
-    <BaseDrawer open={open} onClose={onClose} title="Create School Bundle" width={900}>
+    <BaseDrawer
+      open={open}
+      onClose={onClose}
+      title={schoolName ? `Create Bundle for ${schoolName}` : "Create School Bundle"}
+      width={900}
+    >
       <Stack spacing={4}>
         {/* General Bundle Information */}
         <Box>
@@ -389,6 +406,7 @@ const CreateBundleDrawer: React.FC<CreateBundleDrawerProps> = ({
                   variant="outlined"
                   fullWidth
                   displayEmpty
+                  disabled={!!schoolId}
                 >
                   <MenuItem value="" disabled>
                     Select school
