@@ -137,7 +137,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
           const iconColor = isActive ? "#FFFFFF" : "#121318";
 
           // Clone the icon with the appropriate color
-          const iconWithColor = React.cloneElement(item.icon as React.ReactElement, {
+          const iconWithColor = React.cloneElement(item.icon as React.ReactElement<any>, {
             style: { stroke: iconColor, color: iconColor },
             stroke: iconColor,
           });

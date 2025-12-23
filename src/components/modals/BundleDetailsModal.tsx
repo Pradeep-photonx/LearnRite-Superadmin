@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import {
   Box,
-  Button,
   Stack,
   Typography,
+  Button,
   IconButton,
   Card,
   CardContent,
@@ -304,7 +304,7 @@ const BundleDetailsModal: React.FC<BundleDetailsModalProps> = ({
           )}
 
           {/* Action Buttons */}
-          {/* <Stack
+          <Stack
             direction="row"
             spacing={2}
             justifyContent="flex-end"
@@ -343,7 +343,7 @@ const BundleDetailsModal: React.FC<BundleDetailsModalProps> = ({
             >
               Edit Bundle
             </Button>
-          </Stack> */}
+          </Stack>
         </Stack>
       </DialogContent>
     </Dialog>

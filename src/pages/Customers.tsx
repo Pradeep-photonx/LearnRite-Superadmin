@@ -17,7 +17,7 @@ import {
   MenuItem,
   InputBase,
 } from "@mui/material";
-import { FilterList, Search as SearchIcon } from "@mui/icons-material";
+// Unused imports FilterList and SearchIcon removed
 import { customersData } from "../utilities/customersData";
 import type { Customer } from "../utilities/customersData";
 import { FilterIcon, MoreActionsIcon } from "../components/icons/CommonIcons";

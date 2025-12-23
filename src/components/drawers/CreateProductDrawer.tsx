@@ -12,7 +12,7 @@ import {
   IconButton,
   CircularProgress,
 } from "@mui/material";
-import { Close, CloudUpload } from "@mui/icons-material";
+import { Close, } from "@mui/icons-material";
 import BaseDrawer from "./BaseDrawer";
 import { getCategoryList, getSubCategoryList, type Category, type SubCategory } from "../../api/category";
 import { getBrandList, type Brand } from "../../api/brand";

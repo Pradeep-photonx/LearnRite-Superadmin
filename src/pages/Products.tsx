@@ -31,7 +31,7 @@ import CreateSubCategoryDrawer from "../components/drawers/CreateSubCategoryDraw
 import CreateBrandDrawer from "../components/drawers/CreateBrandDrawer";
 import EditCategoryDrawer from "../components/drawers/EditCategoryDrawer";
 import EditSubCategoryDrawer from "../components/drawers/EditSubCategoryDrawer";
-import EditBrandDrawer from "../components/drawers/EditBundleDrawer";
+import EditBrandDrawer from "../components/drawers/EditBrandDrawer";
 import DeleteConfirmationModal from "../components/modals/DeleteConfirmationModal";
 import { getCategoryList, deleteCategory, getSubCategoryList, deleteSubCategory, type Category, type SubCategory } from "../api/category";
 import { getBrandList, deleteBrand, type Brand } from "../api/brand";
@@ -411,7 +411,7 @@ const Products: React.FC = () => {
     setIsCreateBrandDrawerOpen(false);
   };
 
-  const handleSubmitProduct = (data: ProductFormData) => {
+  const handleSubmitProduct = (_data: ProductFormData) => {
     fetchProducts();
   };
 

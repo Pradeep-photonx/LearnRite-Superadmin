@@ -14,3 +14,4 @@ export type { CategoryFormData } from "./CreateCategoryDrawer";
 export { default as AddStudentDrawer } from "./AddStudentDrawer";
 export type { StudentFormData } from "./AddStudentDrawer";
 export { default as EditStudentDrawer } from "./EditStudentDrawer";
+export { default as EditBrandDrawer } from "./EditBrandDrawer";

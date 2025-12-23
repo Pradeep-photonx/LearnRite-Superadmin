@@ -622,7 +622,6 @@ const SchoolDetailView: React.FC<SchoolDetailViewProps> = ({ school, onBack }) =
                 onClose={handleCloseBundleDetailsDrawer}
                 bundle={selectedBundle}
                 school={currentSchool}
-                onEdit={handleEditBundle}
             />
 
             {/* Edit Bundle Drawer */}

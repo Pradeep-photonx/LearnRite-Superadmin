@@ -23,7 +23,7 @@ import type { School } from "../api/school";
 import AddSchoolDrawer, { type SchoolFormData } from "../components/drawers/AddSchoolDrawer";
 import EditSchoolDrawer from "../components/drawers/EditSchoolDrawer";
 import SchoolDetailView from "../components/drawers/SchoolDetailView";
-import schoolLogo from "../assets/images/delhi-public-school.png";
+// Unused import schoolLogo removed
 import { notifyError, notifySuccess } from "../utils/toastUtils";
 import DeleteConfirmationModal from "../components/modals/DeleteConfirmationModal";
 import { format } from "date-fns";
